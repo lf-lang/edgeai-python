@@ -1,0 +1,216 @@
+/**
+ * @file ComputerVision.lf
+ * @brief File containing Library of Reactor Components for Computer Vision tasks. This library
+ * provides a set of reusable components for performing various computer vision tasks, such as image
+ * classification, object detection, and image segmentation
+ *
+ * @author Vincenzo Barbuto
+ */
+target Python
+
+import MLReactor from "../lib/private/AbstractReactors.lf"
+
+/**
+ * @brief Reactor that extends `MLReactor` performing image classification using a TensorFlow Lite model.
+ *
+ * Args:
+ *    model (str): Absolute path to the TensorFlow Lite model file.
+ *    max_results (int): Maximum number of classification results to return.
+ *    score_threshold (float): Minimum score threshold for classification results.
+ *    num_threads (int): Number of CPU threads to use for inference.
+ *    enable_edgetpu (bool): Whether to use the Edge TPU for inference.
+ *
+ * Inputs:
+ *    input_data (numpy.ndarray): Image data to be classified.
+ *
+ * Outputs:
+ *    results (list[dict]): List of classification results, where each result is a dictionary with the following keys:
+ *        - index (int): Index of the classification result.
+ *        - label (str): Class label of the classification result.
+ *        - score (float): Confidence score of the classification result.
+ *        - head (str): Name of the classification head.
+ *    inference_time (float): Time taken to perform the classification, in milliseconds.
+ *
+ */
+
+reactor ImageClassifier extends MLReactor {
+  preamble {=
+    from tflite_support.task import vision, core, processor
+
+    def collect_results(self, classifications):
+        results_list = []
+        for classification in classifications:
+            results_list.append({
+                "index": classification.categories[0].index,
+                "label": classification.categories[0].category_name,
+                "score": classification.categories[0].score,
+                "head": classification.head_name
+            })
+        return results_list;
+  =}
+
+  reaction(startup) {=
+    if(self.model == ""):
+        print("Error: Please provide a valid model path")
+        lf.request_stop()
+    else:
+        classification_options = self.processor.ClassificationOptions(
+            max_results=self.max_results, score_threshold=self.score_threshold)
+        options = self.vision.ImageClassifierOptions(base_options=self.base_options, classification_options=classification_options)
+        self.executor = self.vision.ImageClassifier.create_from_options(options)
+  =}
+
+  reaction(input_data) -> results, inference_time {=
+    if(input_data.is_present):
+        # Classify the input image and get the result.
+        self.tensor_input = self.vision.TensorImage.create_from_array(input_data.value)
+        start = lf.time.physical()
+        result = self.executor.classify(self.tensor_input)
+        end = (lf.time.physical() - start) / 1000000
+        results.set(self.collect_results(result.classifications))
+        inference_time.set(end)
+    else:
+        print("Error: Input data is not present")
+        lf.request_stop()
+  =}
+
+  reaction(shutdown) {=
+    print("Shutting down ImageClassifier reactor")
+  =}
+}
+
+/**
+ * @brief Reactor that extends `MLReactor` performing image segmentation using a TensorFlow Lite model.
+ *
+ * Args:
+ *    model (str): Absolute path to the TensorFlow Lite model file.
+ *    max_results (int): Maximum number of segmentation results to return.
+ *    score_threshold (float): Minimum score threshold for segmentations results.
+ *    num_threads (int): Number of CPU threads to use for inference.
+ *    enable_edgetpu (bool): Whether to use the Edge TPU for inference.
+ *
+ * Inputs:
+ *    input_data (numpy.ndarray): Image data to be segmented.
+ *
+ * Outputs:
+ *    results (list[dict]): List of segmentation results
+ *    inference_time (float): Time taken to perform the classification, in milliseconds.
+ *
+ */
+
+reactor ImageSegmenter extends MLReactor {
+  preamble {=
+    from tflite_support.task import vision, core, processor
+
+    def collect_results(self, segmentations):
+        results_list = []
+        for segment in segmentations:
+            results_list.append({
+                "segment": segment
+            })
+        return results_list;
+  =}
+
+  reaction(startup) {=
+    if(self.model == ""):
+        print("Error: Please provide a valid model path")
+        lf.request_stop()
+    else:
+        segmentation_options = self.processor.SegmentationOptions(
+            output_type=self.processor.SegmentationOptions.output_type.CATEGORY_MASK)
+        options = self.vision.ImageSegmenterOptions(
+            base_options=self.base_options, segmentation_options=segmentation_options)
+        self.executor = self.vision.ImageSegmenter.create_from_options(options)
+  =}
+
+  reaction(input_data) -> results, inference_time {=
+    if(input_data.is_present):
+        # Classify the input image and get the result.
+        self.tensor_input = self.vision.TensorImage.create_from_array(input_data.value)
+        start = lf.time.physical()
+        result = self.executor.segment(self.tensor_input)
+        end = (lf.time.physical() - start) / 1000000
+        results.set(self.collect_results(result.segmentations))
+        inference_time.set(end)
+    else:
+        print("Error: Input data is not present")
+        lf.request_stop()
+  =}
+}
+
+/**
+ * @brief Reactor that extends `MLReactor` performing object detection using a TensorFlow Lite model.
+ *
+ * Args:
+ *    model (str): Absolute path to the TensorFlow Lite model file.
+ *    max_results (int): Maximum number of detected results to return.
+ *    score_threshold (float): Minimum score threshold for detection results.
+ *    num_threads (int): Number of CPU threads to use for inference.
+ *    enable_edgetpu (bool): Whether to use the Edge TPU for inference.
+ *
+ * Inputs:
+ *   input_data (numpy.ndarray): Input image or video frame data to be processed for object detection.
+ *
+ * Outputs:
+ *    results (list[dict]): List of detection results, where each result is a dictionary with the following keys:
+ *        - index (int): Index of the classification result.
+ *        - label (str): Class label of the classification result.
+ *        - box (str): Bounding box of the detection result.
+ *        - score (float): Confidence score of the detection result.
+ *    inference_time (float): Time taken to perform the object detection, in milliseconds.
+ *
+ */
+
+reactor ObjectDetector extends MLReactor {
+  preamble {=
+    from tflite_support.task import vision, core, processor
+
+    def collect_results(self, detections):
+        results_list = []
+        for detection in detections:
+            results_list.append({
+                "index": detection.categories[0].index,
+                "label": detection.categories[0].category_name,
+                "box": detection.bounding_box,
+                "score": detection.categories[0].score
+            })
+        return results_list;
+  =}
+
+  reaction(startup) {=
+    if(self.model == ""):
+        print("Error: Please provide a valid model path")
+        lf.request_stop()
+    else:
+        detection_options = self.processor.DetectionOptions(
+            max_results=self.max_results, score_threshold=self.score_threshold)
+        options = self.vision.ObjectDetectorOptions(base_options=self.base_options, detection_options=detection_options)
+        self.executor = self.vision.ObjectDetector.create_from_options(options)
+  =}
+
+  reaction(input_data) -> results, inference_time {=
+    if(input_data.is_present):
+        # Detect objects in the input image and get the result.
+        self.tensor_input = self.vision.TensorImage.create_from_array(input_data.value)
+        start = lf.time.physical()
+        result = self.executor.detect(self.tensor_input)
+        end = (lf.time.physical() - start) / 1000000
+        results.set(self.collect_results(result.detections))
+        inference_time.set(end)
+    else:
+        print("Error: Input data is not present")
+        lf.request_stop()
+  =}
+
+  reaction(shutdown) {=
+    print("Shutting down ObjectDetector reactor")
+  =}
+}
+
+# TODO (?)
+reactor ImageSearcher {
+}
+
+# TODO (?)
+reactor ImageEmbedder {
+}
