@@ -79,7 +79,6 @@ To fully download and use the machine learning models in this repository, follow
 3. **Fetch and Pull Models**: Navigate to the root folder of the project and execute the following commands to fetch and pull the large files:
 
     ```bash
-    git lfs fetch
     git lfs pull
     ```
 
