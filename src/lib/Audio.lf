@@ -40,15 +40,16 @@ reactor AudioClassifier extends MLReactor {
     from tflite_support.task import audio, core, processor
 
     def collect_results(self, classifications):
-        results_list = []
-        for classification in classifications:
-            results_list.append({
-                "index": classification.categories[0].index,
-                "label": classification.categories[0].category_name,
-                "score": classification.categories[0].score,
+        results_list = [
+            {
+                "index": classification.categories[0].index if classification.categories else None,
+                "label": classification.categories[0].category_name if classification.categories else None,
+                "score": classification.categories[0].score if classification.categories else None,
                 "head": classification.head_name
-            })
-        return results_list;
+            }
+            for classification in classifications if classification
+        ]
+        return results_list
   =}
 
   reaction(startup) {=

@@ -38,14 +38,15 @@ reactor ImageClassifier extends MLReactor {
     from tflite_support.task import vision, core, processor
 
     def collect_results(self, classifications):
-        results_list = []
-        for classification in classifications:
-            results_list.append({
-                "index": classification.categories[0].index,
-                "label": classification.categories[0].category_name,
-                "score": classification.categories[0].score,
+        results_list = [
+            {
+                "index": classification.categories[0].index if classification.categories else None,
+                "label": classification.categories[0].category_name if classification.categories else None,
+                "score": classification.categories[0].score if classification.categories else None,
                 "head": classification.head_name
-            })
+            }
+            for classification in classifications if classification
+        ]
         return results_list;
   =}
 
@@ -103,11 +104,12 @@ reactor ImageSegmenter extends MLReactor {
     from tflite_support.task import vision, core, processor
 
     def collect_results(self, segmentations):
-        results_list = []
-        for segment in segmentations:
-            results_list.append({
+        results_list = [
+            {
                 "segment": segment
-            })
+            }
+            for segment in segmentations if segment
+        ]
         return results_list;
   =}
 
@@ -166,14 +168,15 @@ reactor ObjectDetector extends MLReactor {
     from tflite_support.task import vision, core, processor
 
     def collect_results(self, detections):
-        results_list = []
-        for detection in detections:
-            results_list.append({
-                "index": detection.categories[0].index,
-                "label": detection.categories[0].category_name,
+        results_list = [
+            {
+                "index": detection.categories[0].index if detection.categories else None,
+                "label": detection.categories[0].category_name if detection.categories else None,
                 "box": detection.bounding_box,
-                "score": detection.categories[0].score
-            })
+                "score": detection.categories[0].score if detection.categories else None
+            }
+            for detection in detections if detection
+        ]
         return results_list;
   =}
 
