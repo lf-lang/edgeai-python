@@ -3,7 +3,9 @@
  * @author Vincenzo Barbuto
  * @brief Examples of how to use the Audio Classification reactor.
  */
-target Python
+target Python{
+  keepalive: true
+}
 
 import Microphone from "lib/Input.lf"
 import AudioClassifier from "lib/Audio.lf"

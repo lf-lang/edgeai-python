@@ -7,27 +7,45 @@
 target Python
 
 /**
- * @brief The `Microphone` reactor is responsible for capturing real-time audio data from a
- * microphone device and emitting it as an output.
+ * @brief The `Microphone` reactor is responsible for capturing audio data in real-time and managing 
+ * its operation states (on/off) based on external inputs.
  * 
- * It uses the `sounddevice` library to open an audio input stream, and provides a callback function that is 
- * called whenever new audio data is available. The recorded audio data is then scheduled to be emitted through 
- * the `audio_data` output.
+ * This reactor leverages the `sounddevice` library to record audio from an input stream and emit it 
+ * through the `audio_data` output. It supports toggling between active (On) and inactive (Off) modes, 
+ * with logical actions and reactions ensuring seamless state transitions.
  * 
  * Args:
- *  buffer_size (int): The size of the audio buffer in samples.
- *  sample_rate (int): The sample rate of the audio in Hz.
- *  channels (int): The number of audio channels.
- *  device (Optional[int]): The audio device to use for recording, or `None` to use the default device.
- *  dtype (Optional[str]): Specifies the sample format of the buffers provided to the stream callback. 
- *  Supported values are 'float32', 'int32', 'int16', 'int8', and 'uint8'. Defaults to `None`, which corresponds 
- *  to a sample format of 'float32'. The default value can be changed using `default.dtype`.
+ *  - `buffer_size` (int): The size of the audio buffer in samples.
+ *  - `sample_rate` (int): The audio sampling rate in Hz.
+ *  - `channels` (int): Number of audio channels (e.g., 1 for mono, 2 for stereo).
+ *  - `device` (Optional[int]): The audio device index to use for recording. If `None`, the default system device is used.
+ *  - `dtype` (Optional[str]): Specifies the sample format for audio buffers ('float32', 'int32', etc.). Defaults to `None`.
+ * 
+ * Inputs:
+ *  - `turn_on`: Signal to switch the reactor into the On state and start recording.
+ *  - `turn_off`: Signal to switch the reactor into the Off state and stop recording.
+ * 
+ * Outputs:
+ *  - `audio_data`: The recorded audio data emitted as a stream.
+ *
+ * Modes:
+ *  - `On`: The active state where audio recording is ongoing. Inputs for `turn_on` are ignored in this state.
+ *  - `Off`: The inactive state where audio recording is stopped. Inputs for `turn_off` are ignored in this state.
  * 
  * Reactions:
- *  startup: Starts the audio input stream and begins recording audio.
- *  send_audio_data: Emits the recorded audio data through the `audio_data` output.
- *  shutdown: Stops the audio input stream and shuts down the reactor.
-*/
+ *  - On:
+ *    - `startup`: Initializes the `turn_on_trigger` action to start the microphone upon activation.
+ *    - `reset`: Initializes the `turn_on_trigger` action to start the microphone upon activation.
+ *    - `turn_on_trigger`: Opens the audio input stream and begins recording audio.
+ *    - `send_audio_data`: Emits the audio data to the `audio_data` output.
+ *    - `turn_off`: Transitions to the `Off` state.
+ *    - `shutdown`: Gracefully shuts down the microphone stream during termination.
+ *  - Off:
+ *    - `reset`: Initializes the `turn_off_trigger` action to stop the microphone upon activation.
+ *    - `turn_off_trigger`: Stops the microphone and transitions to the Off state.
+ *    - `turn_on`: Transitions to the `On` state.
+ * 
+ */
 reactor Microphone(
     buffer_size=15600,
     sample_rate=16000,
@@ -35,8 +53,8 @@ reactor Microphone(
     device = {= None =},
     dtype = {= None =}) {
 
-  physical action send_audio_data
-
+  input turn_off
+  input turn_on
   output audio_data
 
   preamble {=
@@ -46,65 +64,186 @@ reactor Microphone(
     import queue
   =}
 
-  reaction(startup) -> send_audio_data {=
-    def callback(indata, frames, time, status):
-      if status:
-        print(status)
-      if(self.dtype is not None):
-        indata = indata.astype(self.dtype)
-      send_audio_data.schedule(0, indata)
+  initial mode On {
+    physical action send_audio_data
+    logical action turn_on_trigger
 
-    self.stream = self.sd.InputStream(
-      channels=self.channels,
-      samplerate=self.sample_rate,
-      blocksize=self.buffer_size,
-      callback=callback,
-      dtype=self.dtype,
-      device=self.device)
-    self.stream.start()
-    print("#" * 50)
-    print("Recording started")
-    print("#" * 50)
-  =}
+    reaction(startup) -> turn_on_trigger {=
+      turn_on_trigger.schedule(0)
+    =}
 
-  reaction(send_audio_data) -> audio_data {=
-    audio_data.set(send_audio_data.value)
-  =}
+    reaction(reset) -> turn_on_trigger {=
+      turn_on_trigger.schedule(0)
+    =}
 
-  reaction(shutdown) {=
-    if self.stream:
-      self.stream.stop()
-    print("Shutting down Microphone reactor")
-  =}
+    reaction(turn_on_trigger) -> send_audio_data {=
+      def callback(indata, frames, time, status):
+        if status:
+          print(status)
+        if(self.dtype is not None):
+          indata = indata.astype(self.dtype)
+        send_audio_data.schedule(0, indata)
+
+      self.stream = self.sd.InputStream(
+        channels=self.channels,
+        samplerate=self.sample_rate,
+        blocksize=self.buffer_size,
+        callback=callback,
+        dtype=self.dtype,
+        device=self.device)
+      self.stream.start()
+      print("#" * 50)
+      print("Microphone is on, recording started")
+      print("#" * 50)
+    =}
+
+    reaction(send_audio_data) -> audio_data {=
+      audio_data.set(send_audio_data.value)
+    =}
+
+    reaction(turn_off) -> reset(Off) {=
+      print("Turning off Microphone reactor")
+      Off.set()
+    =}
+
+    reaction(shutdown) {=
+      print("Shutting down Microphone reactor")
+      if self.stream:
+        self.stream.stop()
+    =}
+  }
+
+  mode Off {
+    logical action turn_off_trigger
+
+    reaction(reset) -> turn_off_trigger {=
+      print("Reset")
+      turn_off_trigger.schedule(0)
+    =}
+
+    reaction(turn_off_trigger) {=
+      if self.stream:
+        self.stream.stop()
+        print("Microphone is off")
+    =}
+
+    reaction(turn_on) -> reset(On) {=
+      print("Turning on Microphone")
+      On.set()
+    =}
+
+    reaction(shutdown) {=
+      print("Shutting down Microphone reactor")
+    =}
+  }
 }
+
+# TODO: Remove old Microphone reactor
+// reactor Microphone(
+//     buffer_size=15600,
+//     sample_rate=16000,
+//     channels=1,
+//     device = {= None =},
+//     dtype = {= None =}) {
+
+//   state status = 0 # 0 = off, 1 = on
+  
+//   physical action send_audio_data
+//   logical action turn_on_trigger
+//   logical action turn_off_trigger
+
+//   input turn_off
+//   input turn_on
+//   output audio_data
+
+//   preamble {=
+//     import sounddevice as sd
+//     import numpy as np
+//     import threading
+//     import queue
+//   =}
+
+//   reaction(startup) -> turn_on_trigger {=
+//     turn_on_trigger.schedule(0)
+//   =}
+
+//   reaction(turn_on) -> turn_on_trigger {=
+//     turn_on_trigger.schedule(0)
+//   =}
+
+//   reaction(turn_on_trigger) -> send_audio_data {=
+//     def callback(indata, frames, time, status):
+//       if status:
+//         print(status)
+//       if(self.dtype is not None):
+//         indata = indata.astype(self.dtype)
+//       send_audio_data.schedule(0, indata)
+
+//     if(self.status == 0):
+//       self.status = 1
+//       self.stream = self.sd.InputStream(
+//         channels=self.channels,
+//         samplerate=self.sample_rate,
+//         blocksize=self.buffer_size,
+//         callback=callback,
+//         dtype=self.dtype,
+//         device=self.device)
+//       self.stream.start()
+//       print("#" * 50)
+//       print("Recording started")
+//       print("#" * 50)
+//     else:
+//       print("Microphone is already on")
+//   =}
+
+//   reaction(send_audio_data) -> audio_data {=
+//     audio_data.set(send_audio_data.value)
+//   =}
+
+//   reaction(turn_off) -> turn_off_trigger {=
+//     turn_off_trigger.schedule(0)
+//     print("Turning off Microphone reactor")
+//   =}
+
+//   reaction(turn_off_trigger) {=
+//     if self.status == 1 and self.stream:
+//       self.status = 0
+//       self.stream.stop()
+//   =}
+
+//   reaction(shutdown) {=
+//     turn_off_trigger.schedule(0)
+//     print("Shutting down Microphone reactor")
+//   =}
+// }
 
 /**
  * @brief The `Camera` reactor is responsible for capturing real-time video data from 
  * a camera device and emitting it as an output.
  *
  * Args: 
- *  camera_id (int): The ID of the camera to use for capturing video.
- *  fps (int): The desired frames per second for the video capture.
- *  offset (int): The offset in milliseconds for the camera tick timer.
- *  period (int): The period in milliseconds for the camera tick timer. If not set, the FPS will be used instead.
+ *  - `camera_id` (int): The ID of the camera to use for capturing video.
+ *  - `fps` (int): The desired frames per second for the video capture.
+ *  - `offset` (int): The offset in milliseconds for the camera tick timer.
+ *  - `period` (int): The period in milliseconds for the camera tick timer. If not set, the FPS will be used instead.
  *
  * Reactions: 
- *  startup: Initializes the camera stream and captures the first frame. 
- *  trigger: Captures a new video frame and emits it through the `camera_frame` output. 
- *  camera_tick: Captures a new video frame and emits it through the `camera_frame` output.
- *  shutdown: Releases the camera stream.
+ *  - `startup`: Initializes the camera stream and captures the first frame. 
+ *  - `trigger`: Captures a new video frame and emits it through the `camera_frame` output. 
+ *  - `camera_tick`: Captures a new video frame and emits it through the `camera_frame` output.
+ *  - `shutdown`: Releases the camera stream.
  *
  * Inputs: 
- *  trigger: Triggers the capture of a new video frame.
+ *  - `trigger`: Triggers the capture of a new video frame.
  *
  * Outputs: 
- *  camera_frame: The captured video frame.
+ *  - `camera_frame`: The captured video frame.
  */
-reactor Camera(camera_id=0, fps=30, offset = 0, period=0) {
+reactor Camera(camera_id=0, fps=30, offset=0, period=0) {
   input trigger
   output camera_frame
   state capture
-  timer camera_tick(offset, period)
+  timer camera_tick(offset, period)  # TODO: Use logical action instead of timer
 
   preamble {=
     import cv2
@@ -116,20 +255,19 @@ reactor Camera(camera_id=0, fps=30, offset = 0, period=0) {
       if ret:
         return frame
       else:
-        print("WARNING: Camera frame missing.") 
+        print("WARNING: Camera frame missing.")
   =}
 
   reaction(startup) -> camera_frame {=
-    
     self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
-    
+
     if (self.capture.isOpened() == False):
       self.sys.stderr.write("Error: Failed to open the camera.\n")
       lf.request_stop()
 
     # If period is not set, use FPS instead of a fixed time interval
     if(self.period <= 0):
-      # Set the FPS of the camera. If the specified FPS is not supported, 
+      # Set the FPS of the camera. If the specified FPS is not supported,
       # the camera will default to the closest available FPS.
       self.capture.set(self.cv2.CAP_PROP_FPS, self.fps)
       print("FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))

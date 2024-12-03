@@ -1,0 +1,39 @@
+/**
+ * @file TestMicrophone.lf
+ * @author Vincenzo Barbuto
+ * @brief Examples of how to turn on and off the microphone.
+ */
+target Python {
+    keepalive: true
+}
+
+import Microphone from "lib/Input.lf"
+
+reactor Trigger {
+    
+    timer t(5sec,5sec)
+    state count = 0;
+
+    output turn_on
+    output turn_off
+
+    reaction(t) -> turn_on, turn_off {=
+        if self.count == 0:
+            self.count = 1
+            turn_off.set(1)
+        else:
+            self.count = 0
+            turn_on.set(1)
+    =}
+}
+
+main reactor {
+    trigger = new Trigger()
+    mic = new Microphone()
+    trigger.turn_on -> mic.turn_on
+    trigger.turn_off -> mic.turn_off
+
+    reaction(mic.audio_data) {=
+        print("Audio data received")
+    =}
+}
