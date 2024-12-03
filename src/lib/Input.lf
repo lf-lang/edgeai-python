@@ -93,7 +93,7 @@ reactor Microphone(
         device=self.device)
       self.stream.start()
       print("#" * 50)
-      print("Microphone is on, recording started")
+      print("MICROPHONE --> Recording started")
       print("#" * 50)
     =}
 
@@ -102,12 +102,12 @@ reactor Microphone(
     =}
 
     reaction(turn_off) -> reset(Off) {=
-      print("Turning off Microphone reactor")
+      print("MICROPHONE --> Turning off Microphone reactor")
       Off.set()
     =}
 
     reaction(shutdown) {=
-      print("Shutting down Microphone reactor")
+      print("MICROPHONE --> Shutting down Microphone reactor")
       if self.stream:
         self.stream.stop()
     =}
@@ -117,23 +117,22 @@ reactor Microphone(
     logical action turn_off_trigger
 
     reaction(reset) -> turn_off_trigger {=
-      print("Reset")
       turn_off_trigger.schedule(0)
     =}
 
     reaction(turn_off_trigger) {=
       if self.stream:
         self.stream.stop()
-        print("Microphone is off")
+        print("MICROPHONE --> Microphone is off")
     =}
 
     reaction(turn_on) -> reset(On) {=
-      print("Turning on Microphone")
+      print("MICROPHONE --> Turning on Microphone")
       On.set()
     =}
 
     reaction(shutdown) {=
-      print("Shutting down Microphone reactor")
+      print("MICROPHONE --> Shutting down Microphone reactor")
     =}
   }
 }
@@ -270,7 +269,7 @@ reactor Camera(camera_id=0, fps=30, offset=0, period=0) {
       # Set the FPS of the camera. If the specified FPS is not supported,
       # the camera will default to the closest available FPS.
       self.capture.set(self.cv2.CAP_PROP_FPS, self.fps)
-      print("FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))
+      print("CAMERA --> FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))
       # Read the first frame.
       frame = self.capture_frame()
       camera_frame.set(frame)
