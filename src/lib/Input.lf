@@ -385,11 +385,6 @@ reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
       capture_frame.schedule(0)
     =}
 
-    reaction(low_power) -> reset(Idle) {=
-      print("[CAMERA] Switching to idle mode...")
-      Idle.set()
-    =}
-
     reaction(trigger) -> capture_frame {=
       # Read a frame. This is a blocking read.
       capture_frame.schedule(0)
@@ -402,6 +397,11 @@ reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
       if(self.period > 0):
         print("Scheduled")
         capture_frame.schedule(self.period)
+    =}
+
+    reaction(low_power) -> reset(Idle) {=
+      print("[CAMERA] Switching to idle mode...")
+      Idle.set()
     =}
 
     reaction(shutdown) {=
