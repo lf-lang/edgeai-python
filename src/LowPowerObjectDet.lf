@@ -23,6 +23,10 @@ import ObjectDetector from "lib/ComputerVision.lf"
  * system. The `trigger` reactor controls the power mode of the camera, the `camera` reactor
  * captures frames, the `display` reactor visualizes the detection results, and the `obj` reactor
  * performs the object detection.
+ * 
+ * Notes: The period is used to schedule periodic actions in the Camera reactor for frame sampling, 
+ * rather than relying on the trigger input. This is because the trigger input serves as a power_up command, 
+ * and a port named ‘trigger’ can only appear once on the right side of a connection.
  */
 reactor Trigger {
   state s = 0
@@ -43,14 +47,13 @@ reactor Trigger {
 
 main reactor {
   trigger = new Trigger()
-  camera = new Camera(camera_id=1, initial_mode=0)
+  camera = new Camera(initial_mode=0, period=40msec)
   display = new DetectionVisualizer(debug=False)
   obj = new ObjectDetector(
       model = {= os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v1.tflite") =})
-  trigger.turn_on -> camera.power_up
+  trigger.turn_on -> camera.trigger
   trigger.turn_off -> camera.low_power
   camera.camera_frame -> display.original_frame
-  camera.camera_frame ~> camera.trigger
   camera.camera_frame -> obj.input_data
   obj.inference_time -> display.inference_time
   obj.results -> display.results

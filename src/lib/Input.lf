@@ -315,6 +315,7 @@ reactor Microphone(
  *    - `shutdown`: Releases the camera resources during termination.
  * 
  * Notes:
+ *  - The `trigger` input in `Idle` mode will cause mode transition to Active.
  *  - The reactor ensures proper resource cleanup by releasing the camera device when transitioning 
  *    from Active to Idle or during shutdown.
  *  - If the specified `period` is less than the camera's FPS-derived interval, the FPS is used instead.
@@ -322,7 +323,7 @@ reactor Microphone(
  */
 reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
   input trigger
-  input power_up
+  # input power_up
   input low_power
   output camera_frame
 
@@ -355,14 +356,15 @@ reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
         self.capture.release()
     =}
 
-    reaction(power_up) -> reset(Active) {=
+    reaction(trigger) -> reset(Active) {=
       print("[CAMERA] Powering up camera...")
       Active.set()
     =}
   }
 
   mode Active {
-    logical action capture_frame
+    // TODO: Check if this is correct - physical action instead of logical action?
+    physical action capture_frame
     reaction(reset) -> capture_frame {=
       self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
 
@@ -391,11 +393,13 @@ reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
     =}
 
     reaction(capture_frame) -> camera_frame, capture_frame {=
+      elapsed_time = lf.time.logical_elapsed()
+      # print("[CAMERA] Trigger: " + str(elapsed_time))
       # Read a frame. This is a blocking read.
       frame = self.capture_frame()
       camera_frame.set(frame)
       if(self.period > 0):
-        print("Scheduled")
+        #print("[CAMERA] Scheduled")
         capture_frame.schedule(self.period)
     =}
 
