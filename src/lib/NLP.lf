@@ -48,7 +48,7 @@ reactor NLClassifier(BERT_based=True) extends NLPReactor {
 
   reaction(startup) {=
     if(self.model == ""):
-        print("Error: Please provide a valid model path")
+        print("[NL CLASSIFIER] Error: Please provide a valid model path")
         lf.request_stop()
     elif(self.BERT_based):
         self.executor = self.text.BertNLClassifier.create_from_file(self.model)
@@ -64,12 +64,12 @@ reactor NLClassifier(BERT_based=True) extends NLPReactor {
         results.set(self.collect_results(result))
         inference_time.set(end)
     else:
-        print("Error: Input data is not present")
+        print("[NL CLASSIFIER] Error: Input data is not present")
         lf.request_stop()
   =}
 
   reaction(shutdown) {=
-    print("Shutting down NLClassifier reactor")
+    print("[NL CLASSIFIER] Shutting down NLClassifier reactor")
   =}
 }
 
@@ -112,10 +112,10 @@ reactor BertQuestionAnswer(context_file="") extends NLPReactor {
 
   reaction(startup) {=
     if(self.model == ""):
-      print("Error: Please provide a valid model path")
+      print("[BERT Q&A] Error: Please provide a valid model path")
       lf.request_stop()
     elif(self.context_file == ""):
-      print("Error: Please provide a valid context path")
+      print("[BERT Q&A] Error: Please provide a valid context path")
       lf.request_stop()
     else:
       self.executor = self.text.BertQuestionAnswerer.create_from_file(self.model)
@@ -133,14 +133,14 @@ reactor BertQuestionAnswer(context_file="") extends NLPReactor {
   =}
 
   reaction(shutdown) {=
-    print("Shutting down BertQuestionAnswer reactor")
+    print("[BERT Q&A] Shutting down BertQuestionAnswer reactor")
   =}
 }
 
 # TODO
-reactor TextSearcher {
-}
+// reactor TextSearcher {
+// }
 
 # TODO
-reactor TextEmbedder {
-}
+// reactor TextEmbedder {
+// }

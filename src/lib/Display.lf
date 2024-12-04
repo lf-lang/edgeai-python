@@ -15,8 +15,10 @@ target Python {
  * This reactor takes in the original video frame, the inference results, and the inference time,
  * and displays the video frame with the detected objects' bounding boxes drawn on it. It also
  * prints the inference time to the console. The user can press 'q' to exit the video window.
+ *
+ * The `debug` parameter allows the user to enable or disable debug messages.
  */
-reactor DetectionVisualizer {
+reactor DetectionVisualizer(debug=True) {
   input original_frame
   input inference_time
   input results
@@ -27,7 +29,8 @@ reactor DetectionVisualizer {
   =}
 
   reaction(startup) {=
-    print("\n******* Press 'q' in the video window to exit *******\n")
+    if(self.debug):
+      print("\n[DETECTION VISUALIZER] Press 'q' in the video window to exit \n")
   =}
 
   reaction(original_frame, results, inference_time) {=
@@ -35,7 +38,8 @@ reactor DetectionVisualizer {
     frame = original_frame.value
     self.du.draw_bounding_boxes(frame, results.value)
     self.cv2.imshow("frame", frame)
-    print("Inference time: ", inference_time.value)
+    if(self.debug):
+      print("[DETECTION VISUALIZER] Inference time: ", inference_time.value)
     # press 'Q' if you want to exit
     if self.cv2.waitKey(10) & 0xFF == ord('q'):
       request_stop()
@@ -55,7 +59,7 @@ reactor DetectionVisualizer {
  * and displays the video frame with the segmented regions overlaid on it. It also prints the
  * inference time to the console. The user can press 'q' to exit the video window.
  */
-reactor SegmentationVisualizer {
+reactor SegmentationVisualizer(debug=True) {
   input original_frame
   input inference_time
   input results
@@ -66,7 +70,8 @@ reactor SegmentationVisualizer {
   =}
 
   reaction(startup) {=
-    print("\n******* Press 'q' in the video window to exit *******\n")
+    if(self.debug):
+      print("\n[SEGMENTATION VISUALIZER] Press 'q' in the video window to exit *******\n")
   =}
 
   reaction(original_frame, results, inference_time) {=
@@ -80,7 +85,8 @@ reactor SegmentationVisualizer {
             dsize=(frame.shape[1], frame.shape[0]),
             interpolation=self.cv2.INTER_NEAREST)
       overlay = self.su.visualize(frame,seg_map_img,"overlay",0,found_colored_labels)
-      print("Inference time: ", inference_time.value)
+      if(self.debug):
+        print("[SEGMENTATION VISUALIZER] Inference time: ", inference_time.value)
       self.cv2.imshow("frame", overlay)
     # press 'Q' if you want to exit
     if self.cv2.waitKey(10) & 0xFF == ord('q'):

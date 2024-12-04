@@ -1,0 +1,57 @@
+/**
+ * @file LowPowerObjectDet.lf
+ * @author Vincenzo Barbuto
+ * @brief Examples demonstrating how to transition between low-power and active modes using the
+ * CameraMode reactor.
+ */
+target Python {
+  keepalive: true,
+  single-threaded: true  # OpenCV crashes if we use the multithreaded version.
+}
+
+import Camera from "lib/Input.lf"
+import DetectionVisualizer from "lib/Display.lf"
+import ObjectDetector from "lib/ComputerVision.lf"
+
+/**
+ * The `Trigger` reactor is responsible for periodically toggling the power mode of the camera between
+ * low-power and active modes. It uses a timer to switch the state every 10 seconds, setting the
+ * `turn_on` and `turn_off` outputs accordingly.
+ *
+ * The `main` reactor creates instances of the `Trigger`, `Camera`, `DetectionVisualizer`, and
+ * `ObjectDetector` reactors, and connects them together to create a low-power object detection
+ * system. The `trigger` reactor controls the power mode of the camera, the `camera` reactor
+ * captures frames, the `display` reactor visualizes the detection results, and the `obj` reactor
+ * performs the object detection.
+ */
+reactor Trigger {
+  state s = 0
+
+  timer t(0, 10 sec)
+  output turn_on
+  output turn_off
+
+  reaction(t) -> turn_on, turn_off {=
+    if self.s == 0:
+        self.s = 1
+        turn_on.set(1)
+    else:
+        self.s = 0
+        turn_off.set(1)
+  =}
+}
+
+main reactor {
+  trigger = new Trigger()
+  camera = new Camera(camera_id=1, initial_mode=0)
+  display = new DetectionVisualizer(debug=False)
+  obj = new ObjectDetector(
+      model = {= os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v1.tflite") =})
+  trigger.turn_on -> camera.power_up
+  trigger.turn_off -> camera.low_power
+  camera.camera_frame -> display.original_frame
+  camera.camera_frame ~> camera.trigger
+  camera.camera_frame -> obj.input_data
+  obj.inference_time -> display.inference_time
+  obj.results -> display.results
+}

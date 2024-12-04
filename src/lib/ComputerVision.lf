@@ -52,7 +52,7 @@ reactor ImageClassifier extends MLReactor {
 
   reaction(startup) {=
     if(self.model == ""):
-        print("Error: Please provide a valid model path")
+        print("[IMAGE CLASSIFIER] Error: Please provide a valid model path")
         lf.request_stop()
     else:
         classification_options = self.processor.ClassificationOptions(
@@ -71,12 +71,12 @@ reactor ImageClassifier extends MLReactor {
         results.set(self.collect_results(result.classifications))
         inference_time.set(end)
     else:
-        print("Error: Input data is not present")
+        print("[IMAGE CLASSIFIER] Error: Input data is not present")
         lf.request_stop()
   =}
 
   reaction(shutdown) {=
-    print("Shutting down ImageClassifier reactor")
+    print("[IMAGE CLASSIFIER] Shutting down ImageClassifier reactor")
   =}
 }
 
@@ -115,7 +115,7 @@ reactor ImageSegmenter extends MLReactor {
 
   reaction(startup) {=
     if(self.model == ""):
-        print("Error: Please provide a valid model path")
+        print("[IMAGE SEGMENTER] Error: Please provide a valid model path")
         lf.request_stop()
     else:
         segmentation_options = self.processor.SegmentationOptions(
@@ -135,7 +135,7 @@ reactor ImageSegmenter extends MLReactor {
         results.set(self.collect_results(result.segmentations))
         inference_time.set(end)
     else:
-        print("Error: Input data is not present")
+        print("[IMAGE SEGMENTER]  Error: Input data is not present")
         lf.request_stop()
   =}
 }
@@ -182,7 +182,7 @@ reactor ObjectDetector extends MLReactor {
 
   reaction(startup) {=
     if(self.model == ""):
-        print("Error: Please provide a valid model path")
+        print("[OBJECT DETECTOR] Error: Please provide a valid model path")
         lf.request_stop()
     else:
         detection_options = self.processor.DetectionOptions(
@@ -201,19 +201,19 @@ reactor ObjectDetector extends MLReactor {
         results.set(self.collect_results(result.detections))
         inference_time.set(end)
     else:
-        print("Error: Input data is not present")
+        print("[OBJECT DETECTOR] Error: Input data is not present")
         lf.request_stop()
   =}
 
   reaction(shutdown) {=
-    print("Shutting down ObjectDetector reactor")
+    print("[OBJECT DETECTOR] Shutting down ObjectDetector reactor")
   =}
 }
 
 # TODO (?)
-reactor ImageSearcher {
-}
+// reactor ImageSearcher {
+// }
 
 # TODO (?)
-reactor ImageEmbedder {
-}
+// reactor ImageEmbedder {
+// }

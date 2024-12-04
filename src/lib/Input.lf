@@ -52,7 +52,6 @@ reactor Microphone(
     channels=1,
     device = {= None =},
     dtype = {= None =}) {
-
   input turn_off
   input turn_on
   output audio_data
@@ -67,7 +66,6 @@ reactor Microphone(
   initial mode On {
     physical action send_audio_data
     logical action turn_on_trigger
-
     reaction(startup) -> turn_on_trigger {=
       turn_on_trigger.schedule(0)
     =}
@@ -92,9 +90,7 @@ reactor Microphone(
         dtype=self.dtype,
         device=self.device)
       self.stream.start()
-      print("#" * 50)
-      print("[MICROPHONE] Recording started")
-      print("#" * 50)
+      print("[MICROPHONE] Recording...")
     =}
 
     reaction(send_audio_data) -> audio_data {=
@@ -115,7 +111,6 @@ reactor Microphone(
 
   mode Off {
     logical action turn_off_trigger
-
     reaction(reset) -> turn_off_trigger {=
       turn_off_trigger.schedule(0)
     =}
@@ -138,6 +133,7 @@ reactor Microphone(
 }
 
 # TODO: Remove old Microphone reactor
+
 // reactor Microphone(
 //     buffer_size=15600,
 //     sample_rate=16000,
@@ -216,37 +212,127 @@ reactor Microphone(
 //   =}
 // }
 
+# TODO: Remove old Camera reactor
+
+// reactor Camera(camera_id=0, fps=30, period=0) {
+//   input trigger
+//   output camera_frame
+//   state capture
+//   logical action capture_frame
+
+//   preamble {=
+//     import cv2
+//     import sys
+
+//     NSEC = 1000000000
+
+//     # Capture and return the frame
+//     def capture_frame(self):
+//       ret, frame = self.capture.read()
+//       if ret:
+//         return frame
+//       else:
+//         print("[CAMERA] *** Warning: Camera frame missing. ***")
+//   =}
+
+//   reaction(startup) -> capture_frame {=
+//     self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
+
+//     if (self.capture.isOpened() == False):
+//       self.sys.stderr.write("[CAMERA] *** Error: Failed to open the camera. ***\n")
+//       lf.request_stop()
+    
+//     # Check the FPS of the camera.
+//     camera_fps = self.capture.get(self.cv2.CAP_PROP_FPS)
+//     camera_period = 1 / camera_fps * self.NSEC
+
+//     # If period is not set, use FPS instead of a fixed time interval
+//     if(self.period <= 0 or self.period < camera_period):
+//       # Set the FPS of the camera. If the specified FPS is not supported,
+//       # the camera will default to the closest available FPS.
+//       self.capture.set(self.cv2.CAP_PROP_FPS, self.fps)
+//       print("[CAMERA] FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))
+    
+//     # Read the first frame.
+//     capture_frame.schedule(0)
+//   =}
+
+//   reaction(trigger) -> capture_frame {=
+//     # Read a frame. This is a blocking read.
+//     capture_frame.schedule(0)
+//   =}
+
+//   reaction(capture_frame) -> camera_frame, capture_frame {=
+//     # Read a frame. This is a blocking read.
+//     frame = self.capture_frame()
+//     camera_frame.set(frame)
+//     if(self.period > 0):
+//       print("Scheduled")
+//       capture_frame.schedule(self.period)
+//   =}
+
+//   reaction(shutdown) {=
+//     self.capture.release()
+//   =}
+// }
+
 /**
- * @brief The `Camera` reactor is responsible for capturing real-time video data from 
- * a camera device and emitting it as an output.
- *
- * Args: 
- *  - `camera_id` (int): The ID of the camera to use for capturing video.
- *  - `fps` (int): The desired frames per second for the video capture.
- *  - `offset` (int): The offset in milliseconds for the camera tick timer.
- *  - `period` (int): The period in milliseconds for the camera tick timer. If not set, the FPS will be used instead.
- *
- * Reactions: 
- *  - `startup`: Initializes the camera stream and captures the first frame. 
- *  - `trigger`: Captures a new video frame and emits it through the `camera_frame` output. 
- *  - `camera_tick`: Captures a new video frame and emits it through the `camera_frame` output.
- *  - `shutdown`: Releases the camera stream.
- *
- * Inputs: 
- *  - `trigger`: Triggers the capture of a new video frame.
- *
- * Outputs: 
- *  - `camera_frame`: The captured video frame.
+ * @brief The `Camera` reactor manages a camera's operation modes, allowing real-time video capture 
+ * and transitioning between Active and Idle states based on external inputs.
+ * 
+ * This reactor leverages the `cv2` library to interface with a camera device, capturing frames and 
+ * emitting them through the `camera_frame` output. Logical actions and reactions ensure seamless 
+ * state transitions and proper resource management.
+ * 
+ * Args:
+ *  - `camera_id` (int): The ID of the camera device to use. Defaults to 0.
+ *  - `initial_mode` (int): The initial mode of the reactor (1 = active, 0 = idle). Defaults to 1.
+ *  - `fps` (int): Frames per second for the camera. Defaults to 30.
+ *  - `period` (time): The time interval in nanoseconds between frame captures. If 0, the camera's FPS determines the interval.
+ * 
+ * Inputs:
+ *  - `trigger`: Signal to capture a frame in the Active mode.
+ *  - `power_up`: Signal to switch the reactor to the Active mode from Idle.
+ *  - `low_power`: Signal to switch the reactor to the Idle mode from Active.
+ * 
+ * Outputs:
+ *  - `camera_frame`: The captured video frame emitted as output.
+ * 
+ * Modes:
+ *  - `Idle`: The inactive state where the camera is not capturing frames. Inputs for `low_power` are ignored in this state.
+ *  - `Active`: The active state where the camera captures frames at the specified period. Inputs for `power_up` are ignored in this state.
+ * 
+ * Reactions:
+ *  - Idle:
+ *    - `startup`: Checks the initial mode and transitions to Active if `initial_mode` is set to 1.
+ *    - `reset`: Releases the camera resources when transitioning out of Active mode.
+ *    - `power_up`: Transitions to Active mode and initializes the camera for video capture.
+ *  - Active:
+ *    - `reset`: Initializes the camera device and sets its FPS and capture settings.
+ *    - `low_power`: Releases the camera resources and transitions to Idle mode.
+ *    - `trigger`: Schedules the capture of a frame immediately.
+ *    - `capture_frame`: Captures a frame, emits it through the `camera_frame` output, and schedules the next frame based on the `period`.
+ *    - `shutdown`: Releases the camera resources during termination.
+ * 
+ * Notes:
+ *  - The reactor ensures proper resource cleanup by releasing the camera device when transitioning 
+ *    from Active to Idle or during shutdown.
+ *  - If the specified `period` is less than the camera's FPS-derived interval, the FPS is used instead.
+ *  - A warning is logged if a frame cannot be captured.
  */
-reactor Camera(camera_id=0, fps=30, offset=0, period=0) {
+reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
   input trigger
+  input power_up
+  input low_power
   output camera_frame
+
   state capture
-  timer camera_tick(offset, period)  # TODO: Use logical action instead of timer
 
   preamble {=
     import cv2
     import sys
+
+    NSEC = 1000000000
 
     # Capture and return the frame
     def capture_frame(self):
@@ -254,40 +340,72 @@ reactor Camera(camera_id=0, fps=30, offset=0, period=0) {
       if ret:
         return frame
       else:
-        print("WARNING: Camera frame missing.")
+        print("[CAMERA] *** Warning: Camera frame missing. ***")
   =}
 
-  reaction(startup) -> camera_frame {=
-    self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
+  initial mode Idle {
+    reaction(startup) -> reset(Active) {=
+      if(self.initial_mode == 1):
+        Active.set()
+        print("[CAMERA] Powering up camera...")
+    =}
 
-    if (self.capture.isOpened() == False):
-      self.sys.stderr.write("[CAMERA] Error: Failed to open the camera.\n")
-      lf.request_stop()
+    reaction(reset) {=
+      if(self.capture):
+        self.capture.release()
+    =}
 
-    # If period is not set, use FPS instead of a fixed time interval
-    if(self.period <= 0):
-      # Set the FPS of the camera. If the specified FPS is not supported,
-      # the camera will default to the closest available FPS.
-      self.capture.set(self.cv2.CAP_PROP_FPS, self.fps)
-      print("[CAMERA] FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))
+    reaction(power_up) -> reset(Active) {=
+      print("[CAMERA] Powering up camera...")
+      Active.set()
+    =}
+  }
+
+  mode Active {
+    logical action capture_frame
+    reaction(reset) -> capture_frame {=
+      self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
+
+      if (self.capture.isOpened() == False):
+        self.sys.stderr.write("[CAMERA] *** Error: Failed to open the camera. ***\n")
+        lf.request_stop()
+
+      # Check the FPS of the camera.
+      camera_fps = self.capture.get(self.cv2.CAP_PROP_FPS)
+      camera_period = 1 / camera_fps * self.NSEC
+
+      # If period is not set, use FPS instead of a fixed time interval
+      if(self.period <= 0 or self.period < camera_period):
+        # Set the FPS of the camera. If the specified FPS is not supported,
+        # the camera will default to the closest available FPS.
+        self.capture.set(self.cv2.CAP_PROP_FPS, self.fps)
+        print("[CAMERA] FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))
+
       # Read the first frame.
+      capture_frame.schedule(0)
+    =}
+
+    reaction(low_power) -> reset(Idle) {=
+      print("[CAMERA] Switching to idle mode...")
+      Idle.set()
+    =}
+
+    reaction(trigger) -> capture_frame {=
+      # Read a frame. This is a blocking read.
+      capture_frame.schedule(0)
+    =}
+
+    reaction(capture_frame) -> camera_frame, capture_frame {=
+      # Read a frame. This is a blocking read.
       frame = self.capture_frame()
       camera_frame.set(frame)
-  =}
+      if(self.period > 0):
+        print("Scheduled")
+        capture_frame.schedule(self.period)
+    =}
 
-  reaction(trigger) -> camera_frame {=
-    # Read a frame. This is a blocking read.
-    frame = self.capture_frame()
-    camera_frame.set(frame)
-  =}
-
-  reaction(camera_tick) -> camera_frame {=
-    # Read a frame. This is a blocking read.
-    frame = self.capture_frame()
-    camera_frame.set(frame)
-  =}
-
-  reaction(shutdown) {=
-    self.capture.release()
-  =}
+    reaction(shutdown) {=
+      self.capture.release()
+    =}
+  }
 }
