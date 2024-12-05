@@ -364,7 +364,7 @@ reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
 
   mode Active {
     // TODO: Check if this is correct - physical action instead of logical action?
-    physical action capture_frame
+    logical action capture_frame
     reaction(reset) -> capture_frame {=
       self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
 
@@ -393,8 +393,6 @@ reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
     =}
 
     reaction(capture_frame) -> camera_frame, capture_frame {=
-      elapsed_time = lf.time.logical_elapsed()
-      # print("[CAMERA] Trigger: " + str(elapsed_time))
       # Read a frame. This is a blocking read.
       frame = self.capture_frame()
       camera_frame.set(frame)

@@ -38,9 +38,11 @@ reactor Trigger {
   reaction(t) -> turn_on, turn_off {=
     if self.s == 0:
         self.s = 1
+        # print(f"Powering up. Lag: {lf.time.physical_elapsed() - lf.time.logical_elapsed()}")
         turn_on.set(1)
     else:
         self.s = 0
+        # print(f"Powering down... Lag: {lf.time.physical_elapsed() - lf.time.logical_elapsed()}")
         turn_off.set(1)
   =}
 }
