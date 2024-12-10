@@ -18,7 +18,7 @@ target Python {
  *
  * The `debug` parameter allows the user to enable or disable debug messages.
  */
-reactor DetectionVisualizer(debug=True) {
+reactor DetectionVisualizer(debug=False) {
   input original_frame
   input inference_time
   input results
@@ -63,7 +63,7 @@ reactor DetectionVisualizer(debug=True) {
  * and displays the video frame with the segmented regions overlaid on it. It also prints the
  * inference time to the console. The user can press 'q' to exit the video window.
  */
-reactor SegmentationVisualizer(debug=True) {
+reactor SegmentationVisualizer(debug=False) {
   input original_frame
   input inference_time
   input results

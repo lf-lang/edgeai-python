@@ -24,7 +24,7 @@ target Python {
  *  - `device` (optional): The ID or name of the audio input device. Defaults to `None`, which uses the 
  *                         default system device.
  *  - `dtype` (optional): The data type for audio samples. Defaults to `None`.
- *  - `debug` (bool): Enables debug logging for operations. Defaults to true.
+ *  - `debug` (bool): Enables debug logging for operations. Defaults to false.
  * 
  * Inputs:
  *  - `turn_off`: A signal to transition the reactor from On to Off mode.
@@ -61,11 +61,10 @@ reactor Microphone(
     buffer_size=15600,
     sample_rate=16000,
     channels=1,
-    active_at_startup = True,
+    active_at_startup=True,
     device = {= None =},
     dtype = {= None =},
-    debug = True
-  ) {
+    debug=False) {
   input turn_off
   input turn_on
   output audio_data
@@ -78,7 +77,6 @@ reactor Microphone(
   =}
 
   initial mode Idle {
-
     reaction(startup) -> reset(Active) {=
       if self.on_at_startup:
         self.debug and print("[MICROPHONE] Turning on Microphone")
@@ -152,7 +150,7 @@ reactor Microphone(
  *  - `active_at_startup` (bool): If true, the reactor starts in the Active mode. Defaults to true.
  *  - `period` (int): The time interval in nanoseconds between frame captures. Defaults to 0, using the 
  *                    camera's FPS-derived period if not set.
- *  - `debug` (bool): Enables debug logging for operations. Defaults to true.
+ *  - `debug` (bool): Enables debug logging for operations. Defaults to false.
  * 
  * Inputs:
  *  - `trigger`: A signal to capture a frame in the Active mode or to transition from Idle to Active mode.
@@ -190,7 +188,7 @@ reactor Microphone(
  *    value for smooth operation.
  *  - Proper resource cleanup is ensured when transitioning between modes or during shutdown.
  */
-reactor Camera(camera_id=0, active_at_sturtup=True, period=0, debug=True) {
+reactor Camera(camera_id=0, active_at_sturtup=True, period=0, debug=False) {
   input trigger
   input low_power
   output camera_frame
@@ -202,7 +200,7 @@ reactor Camera(camera_id=0, active_at_sturtup=True, period=0, debug=True) {
     from VideoCapture import VideoCapture
 
     NSEC = 1000000000
-      
+
     def get_camera_period(self):
       return int((1 / self.capture.get_fps()) * self.NSEC)
   =}

@@ -5,33 +5,32 @@
 target Python
 
 /**
- * @brief The `MLReactor` reactor is the parent reactor for all other AI algorithms. It provides a unified
- * interface for executing machine learning models and processing their outputs.
- * 
+ * @brief The `MLReactor` reactor is the parent reactor for all other AI algorithms. It provides a
+ * unified interface for executing machine learning models and processing their outputs.
+ *
  * Args:
- *     model (str): The path to the machine learning model.
- *     max_results (int): The maximum number of results to return for each input.
- *     score_threshold (float): The minimum confidence score required for a result to be included in the output.
- *     num_threads (int): The number of threads to use for parallel processing of inputs.
- *     enable_edgetpu (bool): Whether to enable the use of the Edge TPU for accelerated inference.
- * 
+ * - `model` (str): The path to the machine learning model.
+ * - `max_results` (int): The maximum number of results to return for each input.
+ * - `score_threshold` (float): The minimum confidence score required for a result to be included in
+ * the output.
+ * - `num_threads` (int): The number of threads to use for parallel processing of inputs.
+ * - `enable_edgetpu` (bool): Whether to enable the use of the Edge TPU for accelerated inference.
+ * - `debug` (bool): Whether to enable debug logging.
+ *
  * Inputs:
- *     input_data (Any): The input data to be classified or processed (e.g. image, audio, etc.).
- * 
+ * - `input_data` (Any): The input data to be classified or processed (e.g. image, audio, etc.).
+ *
  * Outputs:
- *     results (list[dict]): A list containing the output results for each input.
- *     inference_time (float): Time taken to perform the classification, in milliseconds.
-*/
-
+ * - `results` (list[dict]): A list containing the output results for each input.
+ * - `inference_time` (float): Time taken to perform the classification, in milliseconds.
+ */
 reactor MLReactor(
     model="",
     max_results=2,
     score_threshold=0.0,
     num_threads=4,
     enable_edgetpu=False,
-    debug=True
-  ) {
-  
+    debug=False) {
   state executor
   state tensor_input
   state base_options
@@ -55,18 +54,18 @@ reactor MLReactor(
  * algorithms. It provides a unified interface for executing NLP models and processing their
  * outputs.
  *
- * Args: 
- *     - `model` (str): The path to the NLP model.
- *     - `debug` (bool): Whether to enable debug logging. Defaults to true.
+ * Args:
+ * - `model` (str): The path to the NLP model.
+ * - `debug` (bool): Whether to enable debug logging. Defaults to true.
  *
- * Inputs: 
- *     - `input_data` (Any): The input data to be processed by the NLP model (e.g. text).
+ * Inputs:
+ * - `input_data` (Any): The input data to be processed by the NLP model (e.g. text).
  *
- * Outputs: 
- *     - `results` (list[dict]): A list containing the output results for each input.
- *     - `inference_time` (float): Time taken to perform the NLP processing, in milliseconds.
+ * Outputs:
+ * - `results` (list[dict]): A list containing the output results for each input.
+ * - `inference_time` (float): Time taken to perform the NLP processing, in milliseconds.
  */
-reactor NLPReactor(model="", debug=True) {
+reactor NLPReactor(model="", debug=False) {
   state executor
 
   input input_data
