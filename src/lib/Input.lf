@@ -190,7 +190,7 @@ reactor Microphone(
  *    value for smooth operation.
  *  - Proper resource cleanup is ensured when transitioning between modes or during shutdown.
  */
-reactor Camera(camera_id=0, sampling_interval = 0, active_at_sturtup=True, debug=False, fast = False) {
+reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug=False, fast = False) {
   input trigger
   input low_power
   output camera_frame

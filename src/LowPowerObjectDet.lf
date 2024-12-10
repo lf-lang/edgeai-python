@@ -49,7 +49,7 @@ reactor Trigger {
 
 main reactor {
   trigger = new Trigger()
-  camera = new Camera(camera_id = 1, sampling_interval = 40msec, active_at_sturtup=False, debug=True)
+  camera = new Camera(camera_id = 1, sampling_interval = 40msec, active_at_startup=False, debug=True)
   display = new DetectionVisualizer(debug=False)
   obj = new ObjectDetector(
       model = {= os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v1.tflite") =},
