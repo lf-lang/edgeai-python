@@ -11,30 +11,54 @@ target Python
 import MLReactor from "../lib/private/AbstractReactors.lf"
 
 /**
- *
- * @brief Reactor that extends `MLReactor` reactor performing audio classification using a TensorFlow Lite model.
- *
+ * @brief The `AudioClassifier` reactor extends the `MLReactor` to perform audio classification tasks 
+ * using a TensorFlow Lite model. It processes input audio data and produces classification results 
+ * along with inference time.
+ * 
+ * This reactor leverages the TensorFlow Lite Support Library for audio classification, offering configurable 
+ * options such as model path, maximum results, and score thresholds. It ensures efficient handling of input 
+ * audio and outputs structured classification results.
+ * 
  * Args:
- *    model (str): Absolute path to the TensorFlow Lite model file.
- *    max_results (int): Maximum number of classification results to return.
- *    score_threshold (float): Minimum score threshold for classification results.
- *    num_threads (int): Number of CPU threads to use for inference.
- *    enable_edgetpu (bool): Whether to use the Edge TPU for inference.
- *
+ *  - `model` (str): The path to the TensorFlow Lite model file. Required.
+ *  - `max_results` (int): The maximum number of classification results to return. Defaults to a library-defined value.
+ *  - `score_threshold` (float): The minimum score required to include a classification in the results. Defaults to a library-defined value.
+ *  - `num_threads` (int): The number of CPU threads to use for inference.
+ *  - `enable_edgetpu` (bool): Whether to use the Edge TPU for inference.
+ *  - `debug` (bool): Enables debug logging for operations. Defaults to true.
+ * 
  * Inputs:
- *    input_data (numpy.ndarray): Audio data to be classified.
- *
+ *  - `input_data`: The input audio data to be classified.
+ * 
  * Outputs:
- *    results (list[dict]): List of classification results, where each result is a dictionary with the following keys:
- *        - index (int): Index of the classification result.
- *        - label (str): Class label of the classification result.
- *        - score (float): Confidence score of the classification result.
- *        - head (str): Name of the classification head.
- *    inference_time (float): Time taken to perform the classification, in milliseconds.
- *
- *
-*/
-
+ *  - `results`: A list of classification results, each containing:
+ *    - `index`: The index of the classified category.
+ *    - `label`: The category name.
+ *    - `score`: The classification confidence score.
+ *    - `head`: The name of the classification head.
+ *  - `inference_time`: The time taken for inference in milliseconds.
+ * 
+ * Reactions:
+ *  - `startup`: 
+ *    - Initializes the audio classifier with the provided model path and classification options.
+ *    - Validates that a model path is provided; otherwise, logs an error and requests termination.
+ *    - Prepares the input tensor for audio classification.
+ *  - `input_data`:
+ *    - If input data is present, loads the data into the classifier's input tensor and runs inference.
+ *    - Captures the time taken for inference and outputs it through `inference_time`.
+ *    - Collects and formats the classification results using the `collect_results` method, then outputs them through `results`.
+ *    - Logs an error and requests termination if input data is missing.
+ *  - `shutdown`:
+ *    - Logs the shutdown event in debug mode.
+ * 
+ * Helper Functions:
+ *  - `collect_results`: Processes and formats classification results into a list of dictionaries. Each entry contains:
+ *    - `index`: The index of the top category.
+ *    - `label`: The name of the top category.
+ *    - `score`: The confidence score of the top category.
+ *    - `head`: The classification head name.
+ * 
+ */
 reactor AudioClassifier extends MLReactor {
   preamble {=
     from tflite_support.task import audio, core, processor
@@ -53,8 +77,8 @@ reactor AudioClassifier extends MLReactor {
   =}
 
   reaction(startup) {=
-    if(self.model == ""):
-        print("[AUDIO CLASSIFIER] Error: Please provide a valid model path")
+    if self.model == "":
+        self.debug and print("[AUDIO CLASSIFIER] Error: Please provide a valid model path")
         lf.request_stop()
     else:
         classification_options = self.processor.ClassificationOptions(
@@ -67,7 +91,7 @@ reactor AudioClassifier extends MLReactor {
   =}
 
   reaction(input_data) -> results, inference_time {=
-    if(input_data.is_present):
+    if input_data.is_present and input_data.value is not None:
         # Run inference
         self.tensor_input.load_from_array(input_data.value)
         # Load the input audio and run classify.
@@ -76,12 +100,9 @@ reactor AudioClassifier extends MLReactor {
         end = (lf.time.physical() - start) / 1000000
         results.set(self.collect_results(result.classifications))
         inference_time.set(end)
-    else:
-        print("[AUDIO CLASSIFIER] Error: Input data is not present")
-        lf.request_stop()
   =}
 
   reaction(shutdown) {=
-    print("[AUDIO CLASSIFIER] Shutting down AudioClassifier reactor")
+    self.debug and print("[AUDIO CLASSIFIER] Shutting down AudioClassifier reactor")
   =}
 }

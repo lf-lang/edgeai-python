@@ -38,21 +38,23 @@ reactor Trigger {
   reaction(t) -> turn_on, turn_off {=
     if self.s == 0:
         self.s = 1
-        # print(f"Powering up. Lag: {lf.time.physical_elapsed() - lf.time.logical_elapsed()}")
+        print(f"Powering up. Lag: {lf.time.physical_elapsed() - lf.time.logical_elapsed()}")
         turn_on.set(1)
     else:
         self.s = 0
-        # print(f"Powering down... Lag: {lf.time.physical_elapsed() - lf.time.logical_elapsed()}")
+        print(f"Powering down... Lag: {lf.time.physical_elapsed() - lf.time.logical_elapsed()}")
         turn_off.set(1)
   =}
 }
 
 main reactor {
   trigger = new Trigger()
-  camera = new Camera(initial_mode=0, period=40msec)
+  camera = new Camera(active_at_sturtup=False, period=40msec)
   display = new DetectionVisualizer(debug=False)
   obj = new ObjectDetector(
-      model = {= os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v1.tflite") =})
+      model = {= os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v1.tflite") =},
+      debug=False
+    )
   trigger.turn_on -> camera.trigger
   trigger.turn_off -> camera.low_power
   camera.camera_frame -> display.original_frame

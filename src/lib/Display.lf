@@ -29,20 +29,24 @@ reactor DetectionVisualizer(debug=True) {
   =}
 
   reaction(startup) {=
-    if(self.debug):
-      print("\n[DETECTION VISUALIZER] Press 'q' in the video window to exit \n")
+    self.debug and print("\n[DETECTION VISUALIZER] Press 'q' in the video window to exit \n")
   =}
 
   reaction(original_frame, results, inference_time) {=
     # Get the frame from the input
-    frame = original_frame.value
-    self.du.draw_bounding_boxes(frame, results.value)
-    self.cv2.imshow("frame", frame)
-    if(self.debug):
-      print("[DETECTION VISUALIZER] Inference time: ", inference_time.value)
-    # press 'Q' if you want to exit
-    if self.cv2.waitKey(10) & 0xFF == ord('q'):
-      request_stop()
+    if original_frame.is_present and results.is_present:
+      # Ensure both values are not None
+      frame = original_frame.value
+      result_value = results.value
+
+      if frame is not None and result_value is not None:
+          # Draw bounding boxes and display frame
+          self.du.draw_bounding_boxes(frame, result_value)
+          self.cv2.imshow("frame", frame)
+          self.debug and print(f"[DETECTION VISUALIZER] Inference time: {inference_time.value} ms")
+          # Exit condition (press 'Q' to stop)
+          if self.cv2.waitKey(1) & 0xFF == ord('q'):
+              request_stop()
   =}
 
   reaction(shutdown) {=
@@ -70,27 +74,27 @@ reactor SegmentationVisualizer(debug=True) {
   =}
 
   reaction(startup) {=
-    if(self.debug):
-      print("\n[SEGMENTATION VISUALIZER] Press 'q' in the video window to exit *******\n")
+    self.debug and print("\n[SEGMENTATION VISUALIZER] Press 'q' in the video window to exit\n")
   =}
 
   reaction(original_frame, results, inference_time) {=
-    # Get the frame from the input
-    frame = original_frame.value
-    res = results.value
-    for result in res:
-      seg_map_img, found_colored_labels = self.su.segmentation_map_to_image(result["segment"])
-      seg_map_img = self.cv2.resize(
-            seg_map_img,
-            dsize=(frame.shape[1], frame.shape[0]),
-            interpolation=self.cv2.INTER_NEAREST)
-      overlay = self.su.visualize(frame,seg_map_img,"overlay",0,found_colored_labels)
-      if(self.debug):
-        print("[SEGMENTATION VISUALIZER] Inference time: ", inference_time.value)
-      self.cv2.imshow("frame", overlay)
-    # press 'Q' if you want to exit
-    if self.cv2.waitKey(10) & 0xFF == ord('q'):
-      request_stop()
+    if original_frame.is_present and results.is_present:
+      # Get the frame from the input
+      frame = original_frame.value
+      res = results.value
+      if frame is not None or res is not None:
+        for result in res:
+          seg_map_img, found_colored_labels = self.su.segmentation_map_to_image(result["segment"])
+          seg_map_img = self.cv2.resize(
+                seg_map_img,
+                dsize=(frame.shape[1], frame.shape[0]),
+                interpolation=self.cv2.INTER_NEAREST)
+          overlay = self.su.visualize(frame,seg_map_img,"overlay",0,found_colored_labels)
+          self.debug and print(f"[SEGMENTATION VISUALIZER] Inference time: {inference_time.value} ms")
+          self.cv2.imshow("frame", overlay)
+        # press 'Q' if you want to exit
+        if self.cv2.waitKey(1) & 0xFF == ord('q'):
+          request_stop()
   =}
 
   reaction(shutdown) {=

@@ -4,54 +4,68 @@
  * @author Edward A. Lee
  * @brief Interface library for input devices such as microphones, cameras, and other sensors.
  */
-target Python
+target Python {
+  files: ["../../util/VideoCapture.py"]
+}
 
 /**
- * @brief The `Microphone` reactor is responsible for capturing audio data in real-time and managing 
- * its operation states (on/off) based on external inputs.
+ * @brief The `Microphone` reactor manages audio capture using an input stream and transitions 
+ * between On and Off states based on input signals and startup configuration.
  * 
- * This reactor leverages the `sounddevice` library to record audio from an input stream and emit it 
- * through the `audio_data` output. It supports toggling between active (On) and inactive (Off) modes, 
- * with logical actions and reactions ensuring seamless state transitions.
+ * This reactor uses the `sounddevice` library to capture audio data from a microphone, emitting the 
+ * captured data through the `audio_data` output. It supports configurable parameters such as sample 
+ * rate, buffer size, and data type.
  * 
  * Args:
- *  - `buffer_size` (int): The size of the audio buffer in samples.
- *  - `sample_rate` (int): The audio sampling rate in Hz.
- *  - `channels` (int): Number of audio channels (e.g., 1 for mono, 2 for stereo).
- *  - `device` (Optional[int]): The audio device index to use for recording. If `None`, the default system device is used.
- *  - `dtype` (Optional[str]): Specifies the sample format for audio buffers ('float32', 'int32', etc.). Defaults to `None`.
+ *  - `buffer_size` (int): The size of the audio buffer in samples. Defaults to 15600.
+ *  - `sample_rate` (int): The sample rate of the audio input in Hz. Defaults to 16000.
+ *  - `channels` (int): The number of audio channels. Defaults to 1 (mono).
+ *  - `on_at_startup` (bool): If true, the reactor starts in the On mode. Defaults to true.
+ *  - `device` (optional): The ID or name of the audio input device. Defaults to `None`, which uses the 
+ *                         default system device.
+ *  - `dtype` (optional): The data type for audio samples. Defaults to `None`.
+ *  - `debug` (bool): Enables debug logging for operations. Defaults to true.
  * 
  * Inputs:
- *  - `turn_on`: Signal to switch the reactor into the On state and start recording.
- *  - `turn_off`: Signal to switch the reactor into the Off state and stop recording.
+ *  - `turn_off`: A signal to transition the reactor from On to Off mode.
+ *  - `turn_on`: A signal to transition the reactor from Off to On mode.
  * 
  * Outputs:
- *  - `audio_data`: The recorded audio data emitted as a stream.
- *
+ *  - `audio_data`: The captured audio data emitted as an output.
+ * 
  * Modes:
- *  - `On`: The active state where audio recording is ongoing. Inputs for `turn_on` are ignored in this state.
- *  - `Off`: The inactive state where audio recording is stopped. Inputs for `turn_off` are ignored in this state.
+ *  - `Off`: The inactive state where the microphone is not capturing audio.
+ *  - `On`: The active state where the microphone captures audio and emits it through `audio_data`.
  * 
  * Reactions:
- *  - On:
- *    - `startup`: Initializes the `turn_on_trigger` action to start the microphone upon activation.
- *    - `reset`: Initializes the `turn_on_trigger` action to start the microphone upon activation.
- *    - `turn_on_trigger`: Opens the audio input stream and begins recording audio.
- *    - `send_audio_data`: Emits the audio data to the `audio_data` output.
- *    - `turn_off`: Transitions to the `Off` state.
- *    - `shutdown`: Gracefully shuts down the microphone stream during termination.
  *  - Off:
- *    - `reset`: Initializes the `turn_off_trigger` action to stop the microphone upon activation.
- *    - `turn_off_trigger`: Stops the microphone and transitions to the Off state.
- *    - `turn_on`: Transitions to the `On` state.
+ *    - `startup`: Checks the `on_at_startup` flag and transitions to the On mode if true. Logs the 
+ *                 transition in debug mode.
+ *    - `reset`: Stops the audio stream and logs the microphone shutdown in debug mode.
+ *    - `turn_on`: Logs the activation event in debug mode and transitions to the On mode.
+ *    - `shutdown`: Logs the shutdown event in debug mode.
+ *  - On:
+ *    - `reset`: Initializes the audio input stream with the specified parameters, including buffer 
+ *               size, sample rate, channels, and device. Registers a callback to schedule captured 
+ *               audio data. Starts the stream and logs the event in debug mode.
+ *    - `send_audio_data`: Transfers the captured audio data from the physical action to the 
+ *                         `audio_data` output.
+ *    - `turn_off`: Stops the audio stream, logs the event in debug mode, and transitions to the Off mode.
+ *    - `shutdown`: Stops the audio stream and logs the shutdown event in debug mode.
  * 
+ * Notes:
+ *  - The reactor ensures proper resource cleanup by stopping the audio stream during transitions and 
+ *    shutdown.
  */
 reactor Microphone(
     buffer_size=15600,
     sample_rate=16000,
     channels=1,
+    active_at_startup = True,
     device = {= None =},
-    dtype = {= None =}) {
+    dtype = {= None =},
+    debug = True
+  ) {
   input turn_off
   input turn_on
   output audio_data
@@ -63,22 +77,37 @@ reactor Microphone(
     import queue
   =}
 
-  initial mode On {
+  initial mode Idle {
+
+    reaction(startup) -> reset(Active) {=
+      if self.on_at_startup:
+        self.debug and print("[MICROPHONE] Turning on Microphone")
+        Active.set()
+    =}
+
+    reaction(reset) {=
+      if self.stream:
+        self.stream.stop()
+        self.debug and print("[MICROPHONE] Microphone is off")
+    =}
+
+    reaction(turn_on) -> reset(Active) {=
+      self.debug and print("[MICROPHONE] Turning on Microphone")
+      Active.set()
+    =}
+
+    reaction(shutdown) {=
+      self.debug and print("[MICROPHONE] Shutting down Microphone reactor")
+    =}
+  }
+
+  mode Active {
     physical action send_audio_data
-    logical action turn_on_trigger
-    reaction(startup) -> turn_on_trigger {=
-      turn_on_trigger.schedule(0)
-    =}
-
-    reaction(reset) -> turn_on_trigger {=
-      turn_on_trigger.schedule(0)
-    =}
-
-    reaction(turn_on_trigger) -> send_audio_data {=
+    reaction(reset) -> send_audio_data {=
       def callback(indata, frames, time, status):
         if status:
-          print(status)
-        if(self.dtype is not None):
+          self.debug print(f"[MICROPHONE] Audio sample status: {status}")
+        if self.dtype is not None:
           indata = indata.astype(self.dtype)
         send_audio_data.schedule(0, indata)
 
@@ -90,319 +119,145 @@ reactor Microphone(
         dtype=self.dtype,
         device=self.device)
       self.stream.start()
-      print("[MICROPHONE] Recording...")
+      self.debug and print("[MICROPHONE] Recording...")
     =}
 
     reaction(send_audio_data) -> audio_data {=
       audio_data.set(send_audio_data.value)
     =}
 
-    reaction(turn_off) -> reset(Off) {=
-      print("[MICROPHONE] Turning off Microphone reactor")
-      Off.set()
+    reaction(turn_off) -> reset(Idle) {=
+      self.debug and print("[MICROPHONE] Turning off Microphone reactor")
+      Idle.set()
     =}
 
     reaction(shutdown) {=
-      print("[MICROPHONE] Shutting down Microphone reactor")
+      self.debug and print("[MICROPHONE] Shutting down Microphone reactor")
       if self.stream:
         self.stream.stop()
-    =}
-  }
-
-  mode Off {
-    logical action turn_off_trigger
-    reaction(reset) -> turn_off_trigger {=
-      turn_off_trigger.schedule(0)
-    =}
-
-    reaction(turn_off_trigger) {=
-      if self.stream:
-        self.stream.stop()
-        print("[MICROPHONE] Microphone is off")
-    =}
-
-    reaction(turn_on) -> reset(On) {=
-      print("[MICROPHONE] Turning on Microphone")
-      On.set()
-    =}
-
-    reaction(shutdown) {=
-      print("[MICROPHONE] Shutting down Microphone reactor")
     =}
   }
 }
 
-# TODO: Remove old Microphone reactor
-
-// reactor Microphone(
-//     buffer_size=15600,
-//     sample_rate=16000,
-//     channels=1,
-//     device = {= None =},
-//     dtype = {= None =}) {
-
-//   state status = 0 # 0 = off, 1 = on
-  
-//   physical action send_audio_data
-//   logical action turn_on_trigger
-//   logical action turn_off_trigger
-
-//   input turn_off
-//   input turn_on
-//   output audio_data
-
-//   preamble {=
-//     import sounddevice as sd
-//     import numpy as np
-//     import threading
-//     import queue
-//   =}
-
-//   reaction(startup) -> turn_on_trigger {=
-//     turn_on_trigger.schedule(0)
-//   =}
-
-//   reaction(turn_on) -> turn_on_trigger {=
-//     turn_on_trigger.schedule(0)
-//   =}
-
-//   reaction(turn_on_trigger) -> send_audio_data {=
-//     def callback(indata, frames, time, status):
-//       if status:
-//         print(status)
-//       if(self.dtype is not None):
-//         indata = indata.astype(self.dtype)
-//       send_audio_data.schedule(0, indata)
-
-//     if(self.status == 0):
-//       self.status = 1
-//       self.stream = self.sd.InputStream(
-//         channels=self.channels,
-//         samplerate=self.sample_rate,
-//         blocksize=self.buffer_size,
-//         callback=callback,
-//         dtype=self.dtype,
-//         device=self.device)
-//       self.stream.start()
-//       print("#" * 50)
-//       print("Recording started")
-//       print("#" * 50)
-//     else:
-//       print("Microphone is already on")
-//   =}
-
-//   reaction(send_audio_data) -> audio_data {=
-//     audio_data.set(send_audio_data.value)
-//   =}
-
-//   reaction(turn_off) -> turn_off_trigger {=
-//     turn_off_trigger.schedule(0)
-//     print("Turning off Microphone reactor")
-//   =}
-
-//   reaction(turn_off_trigger) {=
-//     if self.status == 1 and self.stream:
-//       self.status = 0
-//       self.stream.stop()
-//   =}
-
-//   reaction(shutdown) {=
-//     turn_off_trigger.schedule(0)
-//     print("Shutting down Microphone reactor")
-//   =}
-// }
-
-# TODO: Remove old Camera reactor
-
-// reactor Camera(camera_id=0, fps=30, period=0) {
-//   input trigger
-//   output camera_frame
-//   state capture
-//   logical action capture_frame
-
-//   preamble {=
-//     import cv2
-//     import sys
-
-//     NSEC = 1000000000
-
-//     # Capture and return the frame
-//     def capture_frame(self):
-//       ret, frame = self.capture.read()
-//       if ret:
-//         return frame
-//       else:
-//         print("[CAMERA] *** Warning: Camera frame missing. ***")
-//   =}
-
-//   reaction(startup) -> capture_frame {=
-//     self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
-
-//     if (self.capture.isOpened() == False):
-//       self.sys.stderr.write("[CAMERA] *** Error: Failed to open the camera. ***\n")
-//       lf.request_stop()
-    
-//     # Check the FPS of the camera.
-//     camera_fps = self.capture.get(self.cv2.CAP_PROP_FPS)
-//     camera_period = 1 / camera_fps * self.NSEC
-
-//     # If period is not set, use FPS instead of a fixed time interval
-//     if(self.period <= 0 or self.period < camera_period):
-//       # Set the FPS of the camera. If the specified FPS is not supported,
-//       # the camera will default to the closest available FPS.
-//       self.capture.set(self.cv2.CAP_PROP_FPS, self.fps)
-//       print("[CAMERA] FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))
-    
-//     # Read the first frame.
-//     capture_frame.schedule(0)
-//   =}
-
-//   reaction(trigger) -> capture_frame {=
-//     # Read a frame. This is a blocking read.
-//     capture_frame.schedule(0)
-//   =}
-
-//   reaction(capture_frame) -> camera_frame, capture_frame {=
-//     # Read a frame. This is a blocking read.
-//     frame = self.capture_frame()
-//     camera_frame.set(frame)
-//     if(self.period > 0):
-//       print("Scheduled")
-//       capture_frame.schedule(self.period)
-//   =}
-
-//   reaction(shutdown) {=
-//     self.capture.release()
-//   =}
-// }
-
 /**
- * @brief The `Camera` reactor manages a camera's operation modes, allowing real-time video capture 
- * and transitioning between Active and Idle states based on external inputs.
+ * @brief The `Camera` reactor manages a camera's operation, enabling frame capture and transitions 
+ * between Idle and Active states based on input triggers and power signals.
  * 
- * This reactor leverages the `cv2` library to interface with a camera device, capturing frames and 
- * emitting them through the `camera_frame` output. Logical actions and reactions ensure seamless 
- * state transitions and proper resource management.
+ * This reactor utilizes the `VideoCapture` class to interface with the camera device, capturing frames 
+ * and emitting them through the `camera_frame` output. Logical actions and reactions handle state 
+ * transitions and ensure proper camera initialization and cleanup.
  * 
  * Args:
  *  - `camera_id` (int): The ID of the camera device to use. Defaults to 0.
- *  - `initial_mode` (int): The initial mode of the reactor (1 = active, 0 = idle). Defaults to 1.
- *  - `fps` (int): Frames per second for the camera. Defaults to 30.
- *  - `period` (time): The time interval in nanoseconds between frame captures. If 0, the camera's FPS determines the interval.
+ *  - `active_at_startup` (bool): If true, the reactor starts in the Active mode. Defaults to true.
+ *  - `period` (int): The time interval in nanoseconds between frame captures. Defaults to 0, using the 
+ *                    camera's FPS-derived period if not set.
+ *  - `debug` (bool): Enables debug logging for operations. Defaults to true.
  * 
  * Inputs:
- *  - `trigger`: Signal to capture a frame in the Active mode.
- *  - `power_up`: Signal to switch the reactor to the Active mode from Idle.
- *  - `low_power`: Signal to switch the reactor to the Idle mode from Active.
+ *  - `trigger`: A signal to capture a frame in the Active mode or to transition from Idle to Active mode.
+ *  - `low_power`: A signal to transition the reactor from Active to Idle mode.
  * 
  * Outputs:
- *  - `camera_frame`: The captured video frame emitted as output.
+ *  - `camera_frame`: The captured video frame emitted as an output.
+ * 
+ * States:
+ *  - `capture`: Holds the camera resource for frame capture.
  * 
  * Modes:
- *  - `Idle`: The inactive state where the camera is not capturing frames. Inputs for `low_power` are ignored in this state.
- *  - `Active`: The active state where the camera captures frames at the specified period. Inputs for `power_up` are ignored in this state.
+ *  - `Idle`: The inactive state where the camera is powered down. 
+ *  - `Active`: The active state where the camera captures frames at the specified or FPS-derived period.
  * 
  * Reactions:
  *  - Idle:
- *    - `startup`: Checks the initial mode and transitions to Active if `initial_mode` is set to 1.
- *    - `reset`: Releases the camera resources when transitioning out of Active mode.
- *    - `power_up`: Transitions to Active mode and initializes the camera for video capture.
+ *    - `startup`: Checks the `active_at_startup` flag and transitions to the Active mode if true. Logs 
+ *                 the transition in debug mode.
+ *    - `reset`: Releases the camera resource.
+ *    - `trigger`: Logs the activation event in debug mode and transitions to Active mode.
  *  - Active:
- *    - `reset`: Initializes the camera device and sets its FPS and capture settings.
- *    - `low_power`: Releases the camera resources and transitions to Idle mode.
- *    - `trigger`: Schedules the capture of a frame immediately.
- *    - `capture_frame`: Captures a frame, emits it through the `camera_frame` output, and schedules the next frame based on the `period`.
- *    - `shutdown`: Releases the camera resources during termination.
+ *    - `reset`: Initializes the camera device and checks if it is operational. Adjusts the frame 
+ *               capture period based on the specified `period` or the camera's FPS. Logs debug 
+ *               information and schedules the first frame capture.
+ *    - `trigger`: Immediately schedules a frame capture.
+ *    - `capture_frame`: Reads a frame from the camera and emits it through the `camera_frame` output. 
+ *                       Schedules the next frame capture if `period > 0`.
+ *    - `low_power`: Logs the transition to Idle mode in debug mode, releases the camera resource, and 
+ *                   transitions to Idle mode.
+ *    - `shutdown`: Releases the camera resource during reactor shutdown.
  * 
  * Notes:
- *  - The `trigger` input in `Idle` mode will cause mode transition to Active.
- *  - The reactor ensures proper resource cleanup by releasing the camera device when transitioning 
- *    from Active to Idle or during shutdown.
- *  - If the specified `period` is less than the camera's FPS-derived interval, the FPS is used instead.
- *  - A warning is logged if a frame cannot be captured.
+ *  - If the specified `period` is less than the camera's FPS-derived interval, the reactor uses the FPS 
+ *    value for smooth operation.
+ *  - Proper resource cleanup is ensured when transitioning between modes or during shutdown.
  */
-reactor Camera(camera_id=0, initial_mode=1, fps=30, period=0) {
+reactor Camera(camera_id=0, active_at_sturtup=True, period=0, debug=True) {
   input trigger
-  # input power_up
   input low_power
   output camera_frame
 
   state capture
 
   preamble {=
-    import cv2
     import sys
+    from VideoCapture import VideoCapture
 
     NSEC = 1000000000
-
-    # Capture and return the frame
-    def capture_frame(self):
-      ret, frame = self.capture.read()
-      if ret:
-        return frame
-      else:
-        print("[CAMERA] *** Warning: Camera frame missing. ***")
+      
+    def get_camera_period(self):
+      return int((1 / self.capture.get_fps()) * self.NSEC)
   =}
 
   initial mode Idle {
     reaction(startup) -> reset(Active) {=
-      if(self.initial_mode == 1):
+      if self.active_at_sturtup:
         Active.set()
-        print("[CAMERA] Powering up camera...")
+        self.debug and print("[CAMERA] Powering up camera...")
     =}
 
     reaction(reset) {=
-      if(self.capture):
-        self.capture.release()
+      self.capture.release()
     =}
 
     reaction(trigger) -> reset(Active) {=
-      print("[CAMERA] Powering up camera...")
+      self.debug and print("[CAMERA] Powering up camera...")
       Active.set()
     =}
   }
 
   mode Active {
-    // TODO: Check if this is correct - physical action instead of logical action?
     logical action capture_frame
     reaction(reset) -> capture_frame {=
-      self.capture = self.cv2.VideoCapture(self.camera_id, self.cv2.CAP_ANY)
+      self.capture = self.VideoCapture(self.camera_id)
 
-      if (self.capture.isOpened() == False):
+      if not self.capture.is_opened():
         self.sys.stderr.write("[CAMERA] *** Error: Failed to open the camera. ***\n")
         lf.request_stop()
 
       # Check the FPS of the camera.
-      camera_fps = self.capture.get(self.cv2.CAP_PROP_FPS)
-      camera_period = 1 / camera_fps * self.NSEC
+      camera_period = NSEC(self.get_camera_period())
 
-      # If period is not set, use FPS instead of a fixed time interval
-      if(self.period <= 0 or self.period < camera_period):
-        # Set the FPS of the camera. If the specified FPS is not supported,
-        # the camera will default to the closest available FPS.
-        self.capture.set(self.cv2.CAP_PROP_FPS, self.fps)
-        print("[CAMERA] FPS set to: " + str(self.capture.get(self.cv2.CAP_PROP_FPS)))
+      # Adjust the period based on the camera's FPS if necessary.
+      if self.period <= 0 or self.period < camera_period:
+        self.debug and print(f"[CAMERA] FPS set to: {self.capture.get_fps()}")
 
-      # Read the first frame.
+      # Read the first frame
       capture_frame.schedule(0)
     =}
 
     reaction(trigger) -> capture_frame {=
-      # Read a frame. This is a blocking read.
       capture_frame.schedule(0)
     =}
 
     reaction(capture_frame) -> camera_frame, capture_frame {=
-      # Read a frame. This is a blocking read.
-      frame = self.capture_frame()
+      # Read a frame
+      frame = self.capture.read()
       camera_frame.set(frame)
-      if(self.period > 0):
-        #print("[CAMERA] Scheduled")
+      if self.period > 0:
         capture_frame.schedule(self.period)
     =}
 
     reaction(low_power) -> reset(Idle) {=
-      print("[CAMERA] Switching to idle mode...")
+      self.debug and print("[CAMERA] Switching to idle mode...")
       Idle.set()
     =}
 

@@ -28,7 +28,9 @@ reactor MLReactor(
     max_results=2,
     score_threshold=0.0,
     num_threads=4,
-    enable_edgetpu=False) {
+    enable_edgetpu=False,
+    debug=True
+  ) {
   
   state executor
   state tensor_input
@@ -54,16 +56,17 @@ reactor MLReactor(
  * outputs.
  *
  * Args: 
- *     model (str): The path to the NLP model.
+ *     - `model` (str): The path to the NLP model.
+ *     - `debug` (bool): Whether to enable debug logging. Defaults to true.
  *
  * Inputs: 
- *     input_data (Any): The input data to be processed by the NLP model (e.g. text).
+ *     - `input_data` (Any): The input data to be processed by the NLP model (e.g. text).
  *
  * Outputs: 
- *     results (list[dict]): A list containing the output results for each input.
- *     inference_time (float): Time taken to perform the NLP processing, in milliseconds.
+ *     - `results` (list[dict]): A list containing the output results for each input.
+ *     - `inference_time` (float): Time taken to perform the NLP processing, in milliseconds.
  */
-reactor NLPReactor(model="") {
+reactor NLPReactor(model="", debug=True) {
   state executor
 
   input input_data
