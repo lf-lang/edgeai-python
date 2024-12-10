@@ -45,7 +45,7 @@ reactor DetectionVisualizer(debug=False) {
           self.cv2.imshow("frame", frame)
           self.debug and print(f"[DETECTION VISUALIZER] Inference time: {inference_time.value} ms")
           # Exit condition (press 'Q' to stop)
-          if self.cv2.waitKey(1) & 0xFF == ord('q'):
+          if self.cv2.waitKey(10) & 0xFF == ord('q'):
               request_stop()
   =}
 
@@ -93,7 +93,7 @@ reactor SegmentationVisualizer(debug=False) {
           self.debug and print(f"[SEGMENTATION VISUALIZER] Inference time: {inference_time.value} ms")
           self.cv2.imshow("frame", overlay)
         # press 'Q' if you want to exit
-        if self.cv2.waitKey(1) & 0xFF == ord('q'):
+        if self.cv2.waitKey(10) & 0xFF == ord('q'):
           request_stop()
   =}
 

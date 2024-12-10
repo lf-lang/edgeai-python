@@ -27,10 +27,12 @@ import ImageSegmenter from "lib/ComputerVision.lf"
  * you want to use.
  */
 main reactor {
-  camera = new Camera()
+  camera = new Camera(camera_id = 1, fast=True, debug = True)
   display = new SegmentationVisualizer()
   segmenter = new ImageSegmenter(
-      model = {= os.path.join(os.getcwd(),"models/vision/segmentation/deeplab.tflite") =})
+      model = {= os.path.join(os.getcwd(),"models/vision/segmentation/deeplab.tflite") =},
+      score_threshold = 0.65
+    )
   camera.camera_frame -> segmenter.input_data
   camera.camera_frame -> display.original_frame
   camera.camera_frame ~> camera.trigger

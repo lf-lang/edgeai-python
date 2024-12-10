@@ -27,7 +27,7 @@ import ObjectDetector from "lib/ComputerVision.lf"
  * you want to use.
  */
 main reactor {
-  camera = new Camera()
+  camera = new Camera(camera_id=1, fast = True, debug=True)
   display = new DetectionVisualizer()
   obj = new ObjectDetector(
       model = {= os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v1.tflite") =})
