@@ -104,7 +104,7 @@ reactor Microphone(
     reaction(reset) -> send_audio_data {=
       def callback(indata, frames, time, status):
         if status:
-          self.debug print(f"[MICROPHONE] Audio sample status: {status}")
+          self.debug and print(f"[MICROPHONE] Audio sample status: {status}")
         if self.dtype is not None:
           indata = indata.astype(self.dtype)
         send_audio_data.schedule(0, indata)
