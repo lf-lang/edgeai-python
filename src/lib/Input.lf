@@ -253,8 +253,8 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
       elif self.sampling_interval < camera_period:
         self.debug and print(f"[CAMERA] Warning: Sampling interval is less than camera's FPS. Period set to: {self.period}")
 
-      # Read the first frame
-      capture_frame.schedule(0) # use self.period instead ?
+      # Schedule the first frame capture to occur after the camera’s boot-up delay
+      capture_frame.schedule(MSEC(1500))
     =}
 
     reaction(trigger) -> capture_frame {=
