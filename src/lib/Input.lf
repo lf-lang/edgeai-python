@@ -170,14 +170,14 @@ reactor Microphone(
  * 
  * Reactions:
  *  - Idle:
- *    - `startup`: Checks the `active_at_startup` flag and transitions to the Active mode if true. Logs 
- *                 the transition in debug mode.
+ *    - `startup`: Initializes the camera device and checks if it is operational. Adjusts the frame 
+ *                 capture period based on the specified `period` or the camera's FPS. Checks the 
+ *                 `active_at_startup` flag and transitions to the Active mode if true. Logs th 
+ *                 transition in debug mode.
  *    - `reset`: Releases the camera resource.
  *    - `trigger`: Logs the activation event in debug mode and transitions to Active mode.
  *  - Active:
- *    - `reset`: Initializes the camera device and checks if it is operational. Adjusts the frame 
- *               capture period based on the specified `period` or the camera's FPS. Logs debug 
- *               information and schedules the first frame capture.
+ *    - `reset`: Schedules the first frame capture.
  *    - `trigger`: Immediately schedules a frame capture.
  *    - `capture_frame`: Reads a frame from the camera and emits it through the `camera_frame` output. 
  *                       Schedules the next frame capture if `period > 0`.
@@ -211,24 +211,6 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
 
   initial mode Idle {
     reaction(startup) -> reset(Active) {=
-      if self.active_at_startup:
-        Active.set()
-        self.debug and print("[CAMERA] Powering up camera...")
-    =}
-
-    reaction(reset) {=
-      self.capture.release()
-    =}
-
-    reaction(trigger) -> reset(Active) {=
-      self.debug and print("[CAMERA] Powering up camera...")
-      Active.set()
-    =}
-  }
-
-  mode Active {
-    logical action capture_frame
-    reaction(reset) -> capture_frame {=
       self.capture = self.VideoCapture(self.camera_id)
 
       if not self.capture.is_opened():
@@ -253,8 +235,25 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
       elif self.sampling_interval < camera_period:
         self.debug and print(f"[CAMERA] Warning: Sampling interval is less than camera's FPS. Period set to: {self.period}")
 
+      if self.active_at_startup:
+        Active.set()
+        self.debug and print("[CAMERA] Powering up camera...")
+    =}
+
+    reaction(trigger) -> reset(Active) {=
+      self.debug and print("[CAMERA] Powering up camera...")
+      Active.set()
+    =}
+    reaction(shutdown) {=
+      self.capture.release()
+    =}
+  }
+
+  mode Active {
+    logical action capture_frame
+    reaction(reset) -> capture_frame {=
       # Schedule the first frame capture to occur after the camera’s boot-up delay
-      capture_frame.schedule(MSEC(1500))
+      capture_frame.schedule(0)
     =}
 
     reaction(trigger) -> capture_frame {=
