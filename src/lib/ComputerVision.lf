@@ -175,9 +175,8 @@ reactor ImageSegmenter extends MLReactor {
         start = lf.time.physical()
         result = self.executor.segment(self.tensor_input)
         end = (lf.time.physical() - start) / 1000000
-        if result.segmentations is not None:
-          results.set(self.collect_results(result.segmentations))
-          inference_time.set(end)
+        results.set(self.collect_results(result.segmentations))
+        inference_time.set(end)
   =}
 }
 
@@ -261,9 +260,8 @@ reactor ObjectDetector extends MLReactor {
         start = lf.time.physical()
         result = self.executor.detect(self.tensor_input)
         end = (lf.time.physical() - start) / 1000000
-        if result.detections is not None:
-          results.set(self.collect_results(result.detections))
-          inference_time.set(end)
+        results.set(self.collect_results(result.detections))
+        inference_time.set(end)
   =}
 
   reaction(shutdown) {=
