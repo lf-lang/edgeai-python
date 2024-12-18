@@ -95,6 +95,9 @@ reactor ImageClassifier extends MLReactor {
         end = (lf.time.physical() - start) / 1000000
         results.set(self.collect_results(result.classifications))
         inference_time.set(end)
+    else:
+        results.set([])
+        inference_time.set(0)
   =}
 
   reaction(shutdown) {=
@@ -177,6 +180,9 @@ reactor ImageSegmenter extends MLReactor {
         end = (lf.time.physical() - start) / 1000000
         results.set(self.collect_results(result.segmentations))
         inference_time.set(end)
+    else:
+        results.set([])
+        inference_time.set(0)
   =}
 }
 
@@ -262,6 +268,9 @@ reactor ObjectDetector extends MLReactor {
         end = (lf.time.physical() - start) / 1000000
         results.set(self.collect_results(result.detections))
         inference_time.set(end)
+      else:
+        results.set([])
+        inference_time.set(0)
   =}
 
   reaction(shutdown) {=
