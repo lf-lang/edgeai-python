@@ -32,12 +32,12 @@ class VideoCapture:
             if not ret:
                 break
             # Synchronize access to the queue
-            with self.lock:
-                try:
-                    self.q.get_nowait()  # Remove the previous frame if it exists
-                except queue.Empty:
-                    pass
-                self.q.put_nowait(frame)  # Add the latest frame
+            # with self.lock:
+            try:
+                self.q.get_nowait()  # Remove the previous frame if it exists
+            except queue.Empty:
+                pass
+            self.q.put_nowait(frame)  # Add the latest frame
 
     def read(self):
         """
@@ -45,11 +45,11 @@ class VideoCapture:
         Returns:
             The most recent frame or None if no frame is available.
         """
-        with self.lock:  # Synchronize access to the queue
-            try:
-                return self.q.get_nowait()
-            except queue.Empty:
-                return None
+        # with self.lock:  # Synchronize access to the queue
+        try:
+            return self.q.get(timeout=0.005)
+        except queue.Empty:
+            return None
 
     def is_opened(self):
         """

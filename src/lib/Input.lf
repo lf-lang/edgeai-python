@@ -4,7 +4,7 @@
  * @author Edward A. Lee
  * @brief Interface library for input devices such as microphones, cameras, and other sensors.
  */
-target Python {
+ target Python {
   files: ["../../util/VideoCapture.py"]
 }
 
@@ -204,9 +204,18 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
     from VideoCapture import VideoCapture
 
     NSEC = 1000000000
+  =}
 
-    def get_camera_period(self):
-      return int((1 / self.capture.get_fps()) * self.NSEC)
+  method frame_capture(camera_frame, capture_frame){=
+    print(f"[CAMERA] Capturing frame...")
+    frame = self.capture.read()
+    camera_frame.set(frame)
+    if self.period > 0:
+      capture_frame.schedule(self.period)
+  =}
+
+  method get_camera_period(){=
+    return int((1 / self.capture.get_fps()) * self.NSEC)
   =}
 
   initial mode Idle {
@@ -251,22 +260,9 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
 
   mode Active {
     logical action capture_frame
-    reaction(reset) -> capture_frame {=
+    reaction(reset, capture_frame, trigger) -> camera_frame, capture_frame {=
       # Schedule the first frame capture to occur after the camera’s boot-up delay
-      capture_frame.schedule(0)
-    =}
-
-    reaction(trigger) -> capture_frame {=
-      if self.fast_mode:
-        capture_frame.schedule(0)
-    =}
-
-    reaction(capture_frame) -> camera_frame, capture_frame {=
-      # Read a frame
-      frame = self.capture.read()
-      camera_frame.set(frame)
-      if self.period > 0:
-        capture_frame.schedule(self.period)
+      self.frame_capture(camera_frame, capture_frame)
     =}
 
     reaction(low_power) -> reset(Idle) {=
