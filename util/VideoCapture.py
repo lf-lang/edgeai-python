@@ -18,7 +18,6 @@ class VideoCapture:
             raise ValueError(f"Failed to open video source: {source}")
         self.q = queue.Queue(maxsize=1)  # Max size of 1 to hold only the latest frame
         self._stop_event = threading.Event()
-        self.lock = threading.Lock()  # Lock to synchronize access to the queue
         self.thread = threading.Thread(target=self._frame_reader, daemon=True)
         self.thread.start()
 
@@ -30,9 +29,7 @@ class VideoCapture:
         while not self._stop_event.is_set():
             ret, frame = self.cap.read()
             if not ret:
-                break
-            # Synchronize access to the queue
-            # with self.lock:
+                continue
             try:
                 self.q.get_nowait()  # Remove the previous frame if it exists
             except queue.Empty:
@@ -45,7 +42,6 @@ class VideoCapture:
         Returns:
             The most recent frame or None if no frame is available.
         """
-        # with self.lock:  # Synchronize access to the queue
         try:
             return self.q.get(timeout=0.005)
         except queue.Empty:
@@ -69,12 +65,11 @@ class VideoCapture:
         if self.cap.isOpened():
             self.cap.release()
         # Clear the queue to release memory
-        with self.lock:  # Synchronize access to the queue
-            while not self.q.empty():
-                try:
-                    self.q.get_nowait()
-                except queue.Empty:
-                    break
+        while not self.q.empty():
+            try:
+                self.q.get_nowait()
+            except queue.Empty:
+                break
 
     def get_fps(self):
         """
