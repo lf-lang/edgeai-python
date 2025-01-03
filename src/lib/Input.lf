@@ -217,34 +217,36 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
 
   initial mode Idle {
     reaction(startup) -> reset(Active) {=
-      self.capture = self.VideoCapture(self.camera_id)
-
-      if not self.capture.is_opened():
+      try:
+        self.capture = self.VideoCapture(self.camera_id)
+      except Exception as e:
         self.sys.stderr.write("[CAMERA] *** Error: Failed to open the camera. ***\n")
-        lf.request_stop()
+        request_stop()
 
-      # Check the FPS of the camera.
-      camera_period = NSEC(self.get_camera_period())
+      if self.capture and self.capture.is_opened():
 
-      # Check if sampling interval is not set when fast is enabled.
-      # If sampling interval is set, fast mode is disabled.
-      self.fast_mode = self.fast and self.sampling_interval <= 0
+        # Check the FPS of the camera.
+        camera_period = NSEC(self.get_camera_period())
 
-      # Adjust the period based on the camera's FPS if necessary.
-      self.period = (
-          camera_period if (self.sampling_interval <= 0 or self.sampling_interval < camera_period) and not self.fast_mode
-          else self.sampling_interval
-      )
+        # Check if sampling interval is not set when fast is enabled.
+        # If sampling interval is set, fast mode is disabled.
+        self.fast_mode = self.fast and self.sampling_interval <= 0
 
-      self.debug and print(
-          f"[CAMERA] Using camera FPS: {self.capture.get_fps():.2f}" if self.sampling_interval <= 0 else
-          f"[CAMERA] Using custom sampling interval: {self.period} ns" if self.sampling_interval > camera_period else
-          f"[CAMERA] Warning: Sampling interval ({self.period} ns) is less than the camera's frame period ({camera_period:.2f} ns)"
-      )
+        # Adjust the period based on the camera's FPS if necessary.
+        self.period = (
+            camera_period if (self.sampling_interval <= 0 or self.sampling_interval < camera_period) and not self.fast_mode
+            else self.sampling_interval
+        )
 
-      if self.active_at_startup:
-        Active.set()
-        self.debug and print("[CAMERA] Switching to Active mode...")
+        self.debug and print(
+            f"[CAMERA] Using camera FPS: {self.capture.get_fps():.2f}" if self.sampling_interval <= 0 else
+            f"[CAMERA] Using custom sampling interval: {self.period} ns" if self.sampling_interval > camera_period else
+            f"[CAMERA] Warning: Sampling interval ({self.period} ns) is less than the camera's frame period ({camera_period:.2f} ns)"
+        )
+
+        if self.active_at_startup:
+          Active.set()
+          self.debug and print("[CAMERA] Switching to Active mode...")
     =}
 
     reaction(trigger) -> reset(Active) {=
@@ -252,7 +254,9 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
       Active.set()
     =}
     reaction(shutdown) {=
-      self.capture.release()
+      self.debug and print("[CAMERA] Shutting down Camera reactor")
+      if self.capture is not None:
+        self.capture.release()
     =}
   }
 
@@ -275,7 +279,9 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
     =}
 
     reaction(shutdown) {=
-      self.capture.release()
+      self.debug and print("[CAMERA] Shutting down Camera reactor")
+      if self.capture is not None:
+        self.capture.release()
     =}
   }
 }

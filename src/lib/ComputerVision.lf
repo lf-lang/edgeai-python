@@ -78,7 +78,7 @@ reactor ImageClassifier extends MLReactor {
   reaction(startup) {=
     if self.model == "":
         self.debug and print("[IMAGE CLASSIFIER] Error: Please provide a valid model path")
-        lf.request_stop()
+        request_stop()
     else:
         classification_options = self.processor.ClassificationOptions(
             max_results=self.max_results, score_threshold=self.score_threshold)
@@ -162,7 +162,7 @@ reactor ImageSegmenter extends MLReactor {
   reaction(startup) {=
     if self.model == "":
         self.debug and print("[IMAGE SEGMENTER] Error: Please provide a valid model path")
-        lf.request_stop()
+        request_stop()
     else:
         segmentation_options = self.processor.SegmentationOptions(
             output_type=self.processor.SegmentationOptions.output_type.CATEGORY_MASK)
@@ -251,7 +251,7 @@ reactor ObjectDetector extends MLReactor {
   reaction(startup) {=
     if self.model == "":
         self.debug and print("[OBJECT DETECTOR] Error: Please provide a valid model path")
-        lf.request_stop()
+        request_stop()
     else:
         detection_options = self.processor.DetectionOptions(
             max_results=self.max_results, score_threshold=self.score_threshold)

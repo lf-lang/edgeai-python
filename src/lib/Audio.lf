@@ -79,7 +79,7 @@ reactor AudioClassifier extends MLReactor {
   reaction(startup) {=
     if self.model == "":
         self.debug and print("[AUDIO CLASSIFIER] Error: Please provide a valid model path")
-        lf.request_stop()
+        request_stop()
     else:
         classification_options = self.processor.ClassificationOptions(
             max_results=self.max_results, score_threshold=self.score_threshold)
