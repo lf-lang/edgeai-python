@@ -241,7 +241,7 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
         self.debug and print(
             f"[CAMERA] Using camera FPS: {self.capture.get_fps():.2f}" if self.sampling_interval <= 0 else
             f"[CAMERA] Using custom sampling interval: {self.period} ns" if self.sampling_interval > camera_period else
-            f"[CAMERA] Warning: Sampling interval ({self.period} ns) is less than the camera's frame period ({camera_period:.2f} ns)"
+            f"[CAMERA] Warning: Sampling interval ({self.sampling_interval} ns) is less than the camera's frame period ({camera_period:.2f} ns)"
         )
 
         if self.active_at_startup:
