@@ -4,7 +4,7 @@
  * @author Edward A. Lee
  * @brief Interface library for input devices such as microphones, cameras, and other sensors.
  */
- target Python {
+target Python {
   files: ["../../util/VideoCapture.py"]
 }
 
@@ -65,9 +65,11 @@ reactor Microphone(
     device = {= None =},
     dtype = {= None =},
     debug=False) {
+  state stream
   input turn_off
   input turn_on
   output audio_data
+  physical action send_audio_data
 
   preamble {=
     import sounddevice as sd
@@ -76,15 +78,30 @@ reactor Microphone(
     import queue
   =}
 
+  method callback(indata, frames, timesd, status, send_audio_data) {=
+    if status:
+      self.debug and print(f"[MICROPHONE] Audio sample status: {status}")
+    if self.dtype is not None:
+      indata = indata.astype(self.dtype)
+    send_audio_data.schedule(0, indata)
+  =}
+
   initial mode Idle {
-    reaction(startup) -> reset(Active) {=
+    reaction(startup) -> send_audio_data, reset(Active) {=
+      self.stream = self.sd.InputStream(
+        channels=self.channels,
+        samplerate=self.sample_rate,
+        blocksize=self.buffer_size,
+        callback=lambda indata, frames, timesd, status: self.callback(indata, frames, timesd, status, send_audio_data),
+        dtype=self.dtype,
+        device=self.device)
       if self.active_at_startup:
         self.debug and print("[MICROPHONE] Turning on Microphone")
         Active.set()
     =}
 
     reaction(reset) {=
-      if self.stream:
+      if self.stream and self.stream.active:
         self.stream.stop()
         self.debug and print("[MICROPHONE] Microphone is off")
     =}
@@ -96,28 +113,16 @@ reactor Microphone(
 
     reaction(shutdown) {=
       self.debug and print("[MICROPHONE] Shutting down Microphone reactor")
+      if self.stream:
+        self.stream.close()
     =}
   }
 
   mode Active {
-    physical action send_audio_data
-    reaction(reset) -> send_audio_data {=
-      def callback(indata, frames, time, status):
-        if status:
-          self.debug and print(f"[MICROPHONE] Audio sample status: {status}")
-        if self.dtype is not None:
-          indata = indata.astype(self.dtype)
-        send_audio_data.schedule(0, indata)
-
-      self.stream = self.sd.InputStream(
-        channels=self.channels,
-        samplerate=self.sample_rate,
-        blocksize=self.buffer_size,
-        callback=callback,
-        dtype=self.dtype,
-        device=self.device)
-      self.stream.start()
-      self.debug and print("[MICROPHONE] Recording...")
+    reaction(reset) {=
+      if self.stream and self.stream.stopped:
+        self.stream.start()
+        self.debug and print("[MICROPHONE] Recording...")
     =}
 
     reaction(send_audio_data) -> audio_data {=
@@ -132,7 +137,7 @@ reactor Microphone(
     reaction(shutdown) {=
       self.debug and print("[MICROPHONE] Shutting down Microphone reactor")
       if self.stream:
-        self.stream.stop()
+        self.stream.close()
     =}
   }
 }
@@ -190,7 +195,7 @@ reactor Microphone(
  *    value for smooth operation.
  *  - Proper resource cleanup is ensured when transitioning between modes or during shutdown.
  */
-reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug=False, fast = False) {
+reactor Camera(camera_id=0, sampling_interval=0, active_at_startup=True, debug=False, fast=False) {
   input trigger
   input low_power
   output camera_frame
@@ -206,12 +211,12 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
     NSEC = 1000000000
   =}
 
-  method frame_capture(camera_frame){=
+  method frame_capture(camera_frame) {=
     frame = self.capture.read()
     camera_frame.set(frame)
   =}
 
-  method get_camera_period(){=
+  method get_camera_period() {=
     return int((1 / self.capture.get_fps()) * self.NSEC)
   =}
 
@@ -253,6 +258,7 @@ reactor Camera(camera_id=0, sampling_interval = 0, active_at_startup=True, debug
       self.debug and print("[CAMERA] Switching to Active mode...")
       Active.set()
     =}
+
     reaction(shutdown) {=
       self.debug and print("[CAMERA] Shutting down Camera reactor")
       if self.capture is not None:
