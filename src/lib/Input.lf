@@ -4,7 +4,7 @@
  * @author Edward A. Lee
  * @brief Interface library for input devices such as microphones, cameras, and other sensors.
  */
-target Python {
+ target Python {
   files: ["../../util/VideoCapture.py"]
 }
 
@@ -100,12 +100,6 @@ reactor Microphone(
         Active.set()
     =}
 
-    reaction(reset) {=
-      if self.stream and self.stream.active:
-        self.stream.stop()
-        self.debug and print("[MICROPHONE] Microphone is off")
-    =}
-
     reaction(turn_on) -> reset(Active) {=
       self.debug and print("[MICROPHONE] Turning on Microphone")
       Active.set()
@@ -120,9 +114,9 @@ reactor Microphone(
 
   mode Active {
     reaction(reset) {=
-      if self.stream and self.stream.stopped:
+      if self.stream and not self.stream.active:
         self.stream.start()
-        self.debug and print("[MICROPHONE] Recording...")
+      self.debug and print("[MICROPHONE] Recording...")
     =}
 
     reaction(send_audio_data) -> audio_data {=
@@ -252,10 +246,14 @@ reactor Camera(camera_id=0, sampling_interval=0, active_at_startup=True, debug=F
         if self.active_at_startup:
           Active.set()
           self.debug and print("[CAMERA] Switching to Active mode...")
+          self.debug and print(f"[CAMERA] --- Logical Elapsed: {lf.time.logical_elapsed()}. Microstep is {lf.tag().microstep}")
+          self.debug and print(f"[CAMERA] --- Physical Elapsed: {lf.time.physical_elapsed()}")
     =}
 
     reaction(trigger) -> reset(Active) {=
       self.debug and print("[CAMERA] Switching to Active mode...")
+      self.debug and print(f"[CAMERA] --- Logical Elapsed: {lf.time.logical_elapsed()}. Microstep is {lf.tag().microstep}")
+      self.debug and print(f"[CAMERA] --- Physical Elapsed: {lf.time.physical_elapsed()}")
       Active.set()
     =}
 
