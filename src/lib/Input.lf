@@ -66,6 +66,7 @@ reactor Microphone(
     dtype = {= None =},
     debug=False) {
   state stream
+  state is_active = False
   input turn_off
   input turn_on
   output audio_data
@@ -83,7 +84,8 @@ reactor Microphone(
       self.debug and print(f"[MICROPHONE] Audio sample status: {status}")
     if self.dtype is not None:
       indata = indata.astype(self.dtype)
-    send_audio_data.schedule(0, indata)
+    if self.is_active:
+      send_audio_data.schedule(0, indata)
   =}
 
   initial mode Idle {
@@ -116,6 +118,7 @@ reactor Microphone(
     reaction(reset) {=
       if self.stream and not self.stream.active:
         self.stream.start()
+      self.is_active = True
       self.debug and print("[MICROPHONE] Recording...")
     =}
 
@@ -125,6 +128,7 @@ reactor Microphone(
 
     reaction(turn_off) -> reset(Idle) {=
       self.debug and print("[MICROPHONE] Turning off Microphone reactor")
+      self.is_active = False
       Idle.set()
     =}
 
