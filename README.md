@@ -46,7 +46,7 @@ As previously mentioned, the implemented machine learning models utilize [Lite R
 pip install tflite-support
 ```
 
-Refer to the [TensorFlow Lite documentation](https://www.tensorflow.org/lite/guide) for further installation instructions.
+Refer to the [Lite RT documentation](https://ai.google.dev/edge/litert/docs) for further installation instructions.
 
 ### Audio Capturing
 To record, capture, and playback audio, the library `sounddevice` has been used. It can be installed by executing the following command:
