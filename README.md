@@ -19,7 +19,7 @@ The AI algorithms to be included in the library are as follows:
 - **[`ComputerVision.lf`](lib/ComputerVision.lf)**
     - [x] `ImageClassifier`
     - [x] `ImageSegmenter`
-    - [x] `ObjectDetector`
+    - [x] `ObjectDetector` (includes the version that supports runtime switching between different TFLite object detection models)
     <!-- - [ ] `ImageSearcher` (?)
     - [ ] `ImageEmbedder` (?) -->
 - **[`NLP.lf`](lib/NLP.lf)**
