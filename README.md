@@ -96,6 +96,7 @@ In the folder [`src/`](src/), you can find several example LF programs that demo
     - [`Real-Time Image Segmentation`](src/RTImageSegmentation.lf)
     - [`Object Detection`](src/SimpleObjectDetection.lf)
     - [`Real-Time Object Detection`](src/RTObjectDetection.lf)
+    - [`Dynamic Model Switching`](src/DynamicObjectDetection.lf)
 - **`Natural Language Processing`**
     - [`Text Classification`](src/TextClassification.lf)
     - [`Real-Time Speech-to-Text Sentiment Analysis`](src/SentimentAnalysisSpeech.lf)
