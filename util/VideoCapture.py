@@ -24,6 +24,8 @@ class VideoCapture:
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         
+        self._is_released = False  # Initialize release flag
+        
         # Cache FPS value during initialization
         self._fps = self.cap.get(cv2.CAP_PROP_FPS)
         
@@ -75,18 +77,28 @@ class VideoCapture:
     def release(self):
         """
         Release the video capture and stop the frame reading thread.
+        Thread-safe and idempotent.
         """
-        self._stop_event.set()  # Signal the thread to stop
-
-        if self.thread.is_alive():
-            self.thread.join()  # Wait for the thread to exit
-        
         with self._lock:
-            if self.cap.isOpened():
-                self.cap.release()
+            if self._is_released:
+                return
+            self._is_released = True
             
-        # Clear the frame buffer
-        self._current_frame = None
+        try:
+            self._stop_event.set()  # Signal the thread to stop
+            
+            if self.thread.is_alive():
+                self.thread.join(timeout=1.0)  # Wait up to 1 second for thread to exit
+                if self.thread.is_alive():
+                    print("Warning: Frame reader thread did not stop gracefully")
+            
+            with self._lock:
+                if self.cap.isOpened():
+                    self.cap.release()
+                self._current_frame = None
+                
+        except Exception as e:
+            print(f"Error during release: {e}")
 
     def get_fps(self):
         """
@@ -94,4 +106,4 @@ class VideoCapture:
         Returns:
             The cached FPS value as a float.
         """
-        return self._fps
+        return self._fps if self._fps > 0 else 0.0
