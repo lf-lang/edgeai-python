@@ -64,6 +64,7 @@ reactor Microphone(
     active_at_startup=True,
     device = {= None =},
     dtype = {= None =},
+    latency = {= "low" =},
     debug=False) {
   state stream
   state is_active = False
@@ -94,6 +95,7 @@ reactor Microphone(
         channels=self.channels,
         samplerate=self.sample_rate,
         blocksize=self.buffer_size,
+        latency=self.latency,
         callback=lambda indata, frames, timesd, status: self.callback(indata, frames, timesd, status, send_audio_data),
         dtype=self.dtype,
         device=self.device)

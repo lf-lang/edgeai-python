@@ -1,0 +1,94 @@
+/**
+ * @file DynamicModelSwitching.lf
+ * @brief This file demonstrates dynamic model switching in a computer vision pipeline.
+ * It shows how to switch between different object detection models at runtime while
+ * maintaining continuous video processing.
+ *
+ * @author Vincenzo Barbuto
+ */
+target Python {
+    keepalive: true,
+    single-threaded: true
+}
+
+import DetectionVisualizer from "lib/Display.lf"
+import DynamicObjectDetector from "lib/ComputerVision.lf"
+import Camera from "lib/Input.lf"
+
+/**
+ * @brief The `Switcher` reactor is responsible for periodically triggering model switches
+ * in the object detection pipeline. It alternates between two different object detection
+ * models at regular intervals.
+ * 
+ */
+reactor Switcher {
+
+    state nxt_model = "ssd_mobilenet_v2_coco_quant_postprocess"
+
+    output signal
+
+    timer t(10sec,10sec)
+
+    reaction(t)-> signal{=
+        print("Switching ML model")
+        signal.set(self.nxt_model)
+        self.nxt_model = (
+            "ssd_mobilenet_v1"
+            if self.nxt_model == "ssd_mobilenet_v2_coco_quant_postprocess"
+            else "ssd_mobilenet_v2_coco_quant_postprocess"
+        )
+    =}
+
+}
+
+/**
+ * @brief The main reactor sets up and connects the components of the dynamic model
+ * switching demonstration. It creates a pipeline that includes a camera, model switcher,
+ * object detector, and visualizer.
+ * 
+ * This reactor demonstrates a complete computer vision pipeline with dynamic model
+ * switching capabilities. It:
+ * 1. Sets up paths to the object detection models
+ * 2. Initializes a camera for video capture
+ * 3. Creates a model switcher for alternating between models
+ * 4. Configures a dynamic object detector that can switch between models
+ * 5. Sets up a visualizer to display detection results
+ * 6. Connects all components in a processing pipeline
+ * 
+ * States:
+ *  - `model_paths`: List of paths to the object detection model files.
+ * 
+ * Components:
+ *  - `camera`: Captures video frames from the specified camera.
+ *  - `switcher`: Controls the model switching process.
+ *  - `detector`: Performs object detection with dynamic model switching.
+ *  - `visualizer`: Displays the detection results and inference time.
+ * 
+ * Connections:
+ *  - Camera frames are sent to both the detector and visualizer
+ *  - Detector results and inference time are sent to the visualizer
+ *  - Switcher signals control which model the detector uses
+ *  - Camera frames trigger the camera for continuous capture
+ */
+main reactor {
+
+    preamble {=
+        import os
+    =}
+
+    state model_paths = {= {
+        os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v2_coco_quant_postprocess.tflite"),
+        os.path.join(os.getcwd(),"models/vision/detection/ssd_mobilenet_v1.tflite")
+    }=}
+
+    camera = new Camera(camera_id=1, fast = True, debug=True)
+    switcher = new Switcher();
+    detector = new DynamicObjectDetector(model_data={=self.model_paths=}, debug=True);
+    visualizer = new DetectionVisualizer();
+    camera.camera_frame -> detector.input_data
+    camera.camera_frame -> visualizer.original_frame
+    camera.camera_frame ~> camera.trigger
+    detector.inference_time -> visualizer.inference_time
+    detector.results ->  visualizer.results
+    switcher.signal -> detector.signal
+}

@@ -10,7 +10,7 @@ However, recent advancements in edge device hardware and model reduction techniq
 
 ## Library Implementation
 
-The objective is to develop several LF programs incorporating multiple reactors, each implementing a specific AI algorithm optimized for edge devices. These AI algorithms will utilize [TensorFlow Lite](https://www.tensorflow.org/lite/guide), a suite of tools designed for on-device machine learning, enabling developers to run models on mobile, embedded, and edge devices. Specifically, each algorithm will leverage the [TensorFlow Lite Task Library](https://www.tensorflow.org/lite/inference_with_metadata/task_library/overview), which consists of powerful and user-friendly task-specific libraries that facilitate the creation of ML experiences with TFLite. This library offers optimized out-of-the-box model interfaces for popular machine learning tasks, such as image classification and question answering. These model interfaces are designed to maximize performance and usability for each specific task.
+The objective is to develop several LF programs incorporating multiple reactors, each implementing a specific AI algorithm optimized for edge devices. These AI algorithms will utilize [Lite RT](https://ai.google.dev/edge/litert) (formerly TensorFlow Lite), a suite of tools designed for on-device machine learning, enabling developers to run models on mobile, embedded, and edge devices. Specifically, each algorithm will leverage the [TensorFlow Lite Task Library](https://ai.google.dev/edge/litert/libraries/task_library/overview), which consists of powerful and user-friendly task-specific libraries that facilitate the creation of ML experiences with TFLite. This library offers optimized out-of-the-box model interfaces for popular machine learning tasks, such as image classification and question answering. These model interfaces are designed to maximize performance and usability for each specific task.
 
 The AI algorithms to be included in the library are as follows:
 
@@ -19,7 +19,7 @@ The AI algorithms to be included in the library are as follows:
 - **[`ComputerVision.lf`](lib/ComputerVision.lf)**
     - [x] `ImageClassifier`
     - [x] `ImageSegmenter`
-    - [x] `ObjectDetector`
+    - [x] `ObjectDetector` (includes the version that supports runtime switching between different TFLite object detection models)
     <!-- - [ ] `ImageSearcher` (?)
     - [ ] `ImageEmbedder` (?) -->
 - **[`NLP.lf`](lib/NLP.lf)**
@@ -30,7 +30,7 @@ The AI algorithms to be included in the library are as follows:
 
 >  **Note**: The `NLClassifier` supports both **BERT-based** and **Average Word Embedding** (AWE) model architectures.
 
-For each specific task library, a machine learning model is provided in the [`models/`](models/) folder. However, you can train and use your own model with the single reactor. Just be sure to carefully read the [documentation](https://www.tensorflow.org/lite/inference_with_metadata/task_library/overview) for the specific library task API you intend to use to verify model compatibility. Regardless of the model you use, it is important to specify the model's absolute path when instantiating a reactor library in your main reactor. For example:
+For each specific task library, a machine learning model is provided in the [`models/`](models/) folder. However, you can train and use your own model with the single reactor. Just be sure to carefully read the [documentation](https://ai.google.dev/edge/litert/libraries/task_library/overview) for the specific library task API you intend to use to verify model compatibility. Regardless of the model you use, it is important to specify the model's absolute path when instantiating a reactor library in your main reactor. For example:
 ```Python
 cls = new AudioClassifier(model="/absolute/path/to/model.tflite");
 ```
@@ -41,12 +41,12 @@ cls = new AudioClassifier(model="/absolute/path/to/model.tflite");
 In order to correctly use the library, you need to install several dependencies for executing machine learning models, capturing audio and video frames, etc. The following sections describe the dependencies and how to install them.
 
 ### Machine Learning Library
-The implemented machine learning models make use of the [TensorFlow Lite](https://www.tensorflow.org/lite) library. To use the TensorFlow Lite library, you need to install it on your machine. Specifically, the toolkit used to help develop and deploy TFLite models is `tflite-support`. In order to install the toolkit, you can use the following command:
+As previously mentioned, the implemented machine learning models utilize [Lite RT](https://ai.google.dev/edge/litert). Specifically, the `tflite-support` toolkit is used to facilitate the development and deployment of TFLite models. To install the toolkit, run the following command:
 ```shell
 pip install tflite-support
 ```
 
-Refer to the [TensorFlow Lite documentation](https://www.tensorflow.org/lite/guide) for further installation instructions.
+Refer to the [Lite RT documentation](https://ai.google.dev/edge/litert/docs) for further installation instructions.
 
 ### Audio Capturing
 To record, capture, and playback audio, the library `sounddevice` has been used. It can be installed by executing the following command:
@@ -96,6 +96,7 @@ In the folder [`src/`](src/), you can find several example LF programs that demo
     - [`Real-Time Image Segmentation`](src/RTImageSegmentation.lf)
     - [`Object Detection`](src/SimpleObjectDetection.lf)
     - [`Real-Time Object Detection`](src/RTObjectDetection.lf)
+    - [`Dynamic Model Switching`](src/DynamicObjectDetection.lf)
 - **`Natural Language Processing`**
     - [`Text Classification`](src/TextClassification.lf)
     - [`Real-Time Speech-to-Text Sentiment Analysis`](src/SentimentAnalysisSpeech.lf)
