@@ -2,7 +2,7 @@
  * @file ComputerVision.lf
  * @brief File containing Library of Reactor Components for Computer Vision tasks. This library
  * provides a set of reusable components for performing various computer vision tasks, such as image
- * classification, object detection, and image segmentation
+ * classification, object detection, dynamic object detection and image segmentation
  *
  * @author Vincenzo Barbuto
  */
@@ -61,18 +61,19 @@ import MLReactor from "../lib/private/AbstractReactors.lf"
 reactor ImageClassifier extends MLReactor {
   preamble {=
     from tflite_support.task import vision, core, processor
+  =}
 
-    def collect_results(self, classifications):
-        results_list = [
-            {
-                "index": classification.categories[0].index if classification.categories else None,
-                "label": classification.categories[0].category_name if classification.categories else None,
-                "score": classification.categories[0].score if classification.categories else None,
-                "head": classification.head_name
-            }
-            for classification in classifications if classification
-        ]
-        return results_list;
+  method collect_results(classifications){=
+    results_list = [
+        {
+            "index": classification.categories[0].index if classification.categories else None,
+            "label": classification.categories[0].category_name if classification.categories else None,
+            "score": classification.categories[0].score if classification.categories else None,
+            "head": classification.head_name
+        }
+        for classification in classifications if classification
+    ]
+    return results_list;
   =}
 
   reaction(startup) {=
@@ -148,15 +149,16 @@ reactor ImageClassifier extends MLReactor {
 reactor ImageSegmenter extends MLReactor {
   preamble {=
     from tflite_support.task import vision, core, processor
+  =}
 
-    def collect_results(self, segmentations):
-        results_list = [
-            {
-                "segment": segment
-            }
-            for segment in segmentations if segment
-        ]
-        return results_list;
+  method collect_results(segmentations){=
+    results_list = [
+        {
+            "segment": segment
+        }
+        for segment in segmentations if segment
+    ]
+    return results_list;
   =}
 
   reaction(startup) {=
@@ -234,18 +236,19 @@ reactor ImageSegmenter extends MLReactor {
 reactor ObjectDetector extends MLReactor {
   preamble {=
     from tflite_support.task import vision, core, processor
+  =}
 
-    def collect_results(self, detections):
-        results_list = [
-            {
-                "index": detection.categories[0].index if detection.categories else None,
-                "label": detection.categories[0].category_name if detection.categories else None,
-                "box": detection.bounding_box,
-                "score": detection.categories[0].score if detection.categories else None
-            }
-            for detection in detections if detection
-        ]
-        return results_list;
+  method collect_results(detections) {=
+    results_list = [
+        {
+            "index": detection.categories[0].index if detection.categories else None,
+            "label": detection.categories[0].category_name if detection.categories else None,
+            "box": detection.bounding_box,
+            "score": detection.categories[0].score if detection.categories else None
+        }
+        for detection in detections if detection
+    ]
+    return results_list;
   =}
 
   reaction(startup) {=
@@ -279,9 +282,179 @@ reactor ObjectDetector extends MLReactor {
 }
 
 # TODO (?)
-// reactor ImageSearcher {
-// }
-
+# reactor ImageSearcher {
+# }
 # TODO (?)
-// reactor ImageEmbedder {
-// }
+# reactor ImageEmbedder {
+# }
+
+/**
+ * @brief The `DynamicObjectDetector` reactor extends the `MLReactor` to perform dynamic object detection tasks 
+ * using multiple TensorFlow Lite models. It allows for runtime switching between different object detection models 
+ * based on input signals, while maintaining consistent detection capabilities.
+ * 
+ * This reactor leverages the TensorFlow Lite Support Library for object detection, offering configurable 
+ * options such as model paths, detection score threshold, and maximum number of results. It efficiently handles 
+ * model switching and maintains detection performance across different models.
+ * 
+ * Args:
+ *  - `model_data` (list): A list of paths to TensorFlow Lite model files. Required.
+ *  - `max_results` (int): The maximum number of detection results to return. Defaults to 2.
+ *  - `score_threshold` (float): The minimum score required to include a detection in the results. Defaults to 0.3.
+ *  - `num_threads` (int): Number of CPU threads to use for inference. Defaults to 4.
+ *  - `enable_edgetpu` (bool): Whether to use the Edge TPU for inference. Defaults to false.
+ *  - `debug` (bool): Enables debug logging for operations. Defaults to false.
+ * 
+ * Inputs:
+ *  - `input_data`: The input image data in which objects will be detected.
+ *  - `signal`: A signal input that triggers model switching, containing the name of the model to switch to.
+ * 
+ * Outputs:
+ *  - `results`: A list of detection results, each containing:
+ *    - `index`: The index of the detected category.
+ *    - `label`: The name of the detected category.
+ *    - `box`: The bounding box coordinates for the detected object.
+ *    - `score`: The confidence score of the detection.
+ *  - `inference_time`: The time taken for inference in milliseconds.
+ * 
+ * States:
+ *  - `model_paths`: Dictionary mapping model names to their file paths.
+ *  - `current_model`: Name of the currently active model.
+ *  - `executor`: The current TensorFlow Lite model executor.
+ *  - `isSwitching`: Flag indicating if a model switch is in progress.
+ *  - `switch_count`: Counter tracking the number of successful model switches.
+ * 
+ * Reactions:
+ *  - `startup`: 
+ *    - Initializes the dynamic object detector by loading the first model from the provided model paths.
+ *    - Validates that model paths are provided; otherwise, logs an error.
+ *  - `signal`:
+ *    - Handles model switching requests based on the input signal.
+ *    - Validates the requested model exists in the known model paths.
+ *    - Initializes the new model while maintaining the previous model as fallback.
+ *    - Updates the current model state and increments the switch counter on success.
+ *  - `input_data`:
+ *    - If input data is present and no model switch is in progress, performs object detection.
+ *    - Captures the time taken for inference and outputs it through `inference_time`.
+ *    - Collects and formats the detection results using the `collect_results` method.
+ *    - Logs detection details including model name, label, confidence score, and inference time.
+ *  - `shutdown`:
+ *    - Logs the total number of model switches performed during runtime.
+ * 
+ * Helper Functions:
+ *  - `initialize_detector`: Initializes a new object detector with the specified model path.
+ *  - `collect_results`: Processes and formats detection results into a list of dictionaries.
+ */
+
+reactor DynamicObjectDetector(
+    model_data = {= [ ] =},
+    max_results=2,
+    score_threshold=0.3,
+    num_threads=4,
+    enable_edgetpu=False,
+    debug=False) {
+
+  preamble {=
+      from tflite_support.task import vision, core, processor
+  =}
+  input input_data
+  input signal
+
+  output results
+  output inference_time
+
+  state model_paths = {= { } =}
+  state current_model = ""
+  state executor
+  state isSwitching = False
+  state switch_count = 0
+
+  method initialize_detector(model_path) {=
+    try:
+        base_options = self.core.BaseOptions(
+            file_name=model_path,
+            use_coral=self.enable_edgetpu,
+            num_threads=self.num_threads)
+        detection_options = self.processor.DetectionOptions(
+            max_results=self.max_results,
+            score_threshold=self.score_threshold)
+        options = self.vision.ObjectDetectorOptions(
+            base_options=base_options,
+            detection_options=detection_options)
+        self.executor = self.vision.ObjectDetector.create_from_options(options)
+        self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Successfully loaded model: {model_path}")
+        return True
+    except Exception as e:
+        self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Error initializing detector with model {model_path}: {e}")
+        return False
+  =}
+
+  method collect_results(detections) {=
+    results_list = [
+        {
+            "index": detection.categories[0].index if detection.categories else None,
+            "label": detection.categories[0].category_name if detection.categories else None,
+            "box": detection.bounding_box,
+            "score": detection.categories[0].score if detection.categories else None
+        }
+        for detection in detections if detection
+    ]
+    return results_list;
+  =}
+
+  reaction(startup) {=
+    if not self.isSwitching and self.model_data:
+        for model_path in self.model_data:
+            model_name = model_path.split('/')[-1].split('.')[0]
+            self.model_paths[model_name] = model_path
+            self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Added model '{model_name}' with path '{model_path}'")
+        if self.model_paths:
+            first_model = next(iter(self.model_paths))
+            self.current_model = first_model
+            self.initialize_detector(self.model_paths[first_model])
+  =}
+
+  reaction(signal) {=
+    nxt_model = signal.value
+    self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Model received '{nxt_model}' ")
+    if nxt_model == self.current_model:
+        self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Model '{nxt_model}' is already active.")
+    elif nxt_model not in self.model_paths:
+        self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Error: Model '{nxt_model}' not found in known model paths. Cannot switch.")
+    else:
+        try:
+            self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Attempting to auto-switch model from '{self.current_model}' to '{nxt_model}'...")
+            model_path = self.model_paths[nxt_model]
+            load_successful = self.initialize_detector(model_path)
+            if load_successful:
+                self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Successfully loaded and switched to model '{nxt_model}'.")
+                self.current_model = nxt_model
+                self.switch_count += 1
+            else:
+                # Keep the previous model if loading fails
+                self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Failed to initialize model '{nxt_model}'. Keeping '{self.current_model}'.")
+        finally:
+            # Ensure this flag is reset regardless of success or failure within the block
+            self.isSwitching = False
+  =}
+
+  reaction(input_data) -> results, inference_time {=
+    if input_data.is_present and input_data.value is not None and not self.isSwitching:
+        # Detect objects in the input image and get the result.
+        tensor_input = self.vision.TensorImage.create_from_array(input_data.value)
+        start = lf.time.physical()
+        result = self.executor.detect(tensor_input)
+        end = (lf.time.physical() - start) / 1000000
+        res = self.collect_results(result.detections)
+        value = res[0] if res else None
+        label = value.get("label") if value else None
+        score = value.get("score") if value else None
+        self.debug and print(f"[DYNAMIC OBJECT DETECTOR] Model: {self.current_model} Label: {label}, Confidence: {score}, Time: {end}")
+        results.set(res)
+        inference_time.set(end)
+  =}
+
+  reaction(shutdown) {=
+    self.debug and print(f"\n[DYNAMIC OBJECT DETECTOR] Total model switches: {self.switch_count}")
+  =}
+}

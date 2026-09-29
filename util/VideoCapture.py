@@ -1,6 +1,7 @@
 import cv2
 import threading
 import time
+import logging
 
 class VideoCapture:
     """
@@ -23,6 +24,7 @@ class VideoCapture:
         self._current_frame = None
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
+        self._is_released = False
         
         self._is_released = False
         
@@ -44,6 +46,7 @@ class VideoCapture:
         """
         frame_interval = (1.0 / self._fps) if (self._fps and self._fps > 0) else 0.033
         while not self._stop_event.is_set():
+<<<<<<< HEAD
             try:
                 with self._lock:
                     if self._is_released or not self.cap.isOpened():
@@ -71,6 +74,16 @@ class VideoCapture:
                         break
             except Exception:
                 # Catch any unexpected error during interpreter shutdown
+=======
+            if not self.cap.isOpened():
+                logging.warning("VideoCapture is closed.")
+                break
+
+            ret, frame = self.cap.read()
+            
+            if not ret:
+                logging.warning("Failed to read frame. Stopping thread.")
+>>>>>>> fec4279609bd4c578373b85ceb39782299c7fdc0
                 break
 
     def read(self):
@@ -98,6 +111,7 @@ class VideoCapture:
 
     def release(self):
         """
+<<<<<<< HEAD
         Release the video capture and stop the frame reading thread safely and idempotently.
         """
         self._stop_event.set()  # Signal the thread to stop immediately
@@ -115,6 +129,31 @@ class VideoCapture:
                 except Exception:
                     pass
                 self._current_frame = None
+=======
+        Release the video capture and stop the frame reading thread.
+        Thread-safe and idempotent.
+        """
+        with self._lock:
+            if self._is_released:
+                return
+            self._is_released = True
+            
+        try:
+            self._stop_event.set()  # Signal the thread to stop
+            
+            if self.thread.is_alive():
+                self.thread.join(timeout=1.0)  # Wait up to 1 second for thread to exit
+                if self.thread.is_alive():
+                    logging.warning("Frame reader thread did not stop gracefully")
+            
+            with self._lock:
+                if self.cap.isOpened():
+                    self.cap.release()
+                self._current_frame = None
+                
+        except Exception as e:
+            logging.error(f"Error during release: {e}")
+>>>>>>> fec4279609bd4c578373b85ceb39782299c7fdc0
 
     def get_fps(self):
         """
@@ -122,4 +161,4 @@ class VideoCapture:
         Returns:
             The cached FPS value as a float.
         """
-        return self._fps
+        return self._fps if self._fps > 0 else 0.0
