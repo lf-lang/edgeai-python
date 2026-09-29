@@ -24,6 +24,8 @@ class VideoCapture:
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         
+        self._is_released = False
+        
         # Cache FPS value during initialization
         self._fps = self.cap.get(cv2.CAP_PROP_FPS)
         
@@ -38,21 +40,38 @@ class VideoCapture:
     def _frame_reader(self):
         """
         Continuously reads frames from the video source in a separate thread,
-        updating the most recent frame.
+        updating the most recent frame at natural FPS pacing.
         """
+        frame_interval = (1.0 / self._fps) if (self._fps and self._fps > 0) else 0.033
         while not self._stop_event.is_set():
-            if not self.cap.isOpened():
-                print("Warning: VideoCapture is closed.")
-                break
+            try:
+                with self._lock:
+                    if self._is_released or not self.cap.isOpened():
+                        break
+                    t_start = time.time()
+                    ret, frame = self.cap.read()
+                    
+                    if not ret:
+                        if self._stop_event.is_set() or self._is_released:
+                            break
+                        # Video file reached EOF: rewind to start (loop)
+                        self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        ret, frame = self.cap.read()
+                        if not ret:
+                            print("Warning: Failed to read frame after rewind. Stopping thread.")
+                            break
 
-            ret, frame = self.cap.read()
-            
-            if not ret:
-                print("Warning: Failed to read frame. Stopping thread.")
+                    self._current_frame = frame
+
+                # Pacing: use _stop_event.wait so shutdown wakes up immediately
+                elapsed = time.time() - t_start
+                sleep_time = frame_interval - elapsed
+                if sleep_time > 0:
+                    if self._stop_event.wait(timeout=sleep_time):
+                        break
+            except Exception:
+                # Catch any unexpected error during interpreter shutdown
                 break
-            
-            with self._lock:
-                self._current_frame = frame
 
     def read(self):
         """
@@ -70,23 +89,32 @@ class VideoCapture:
             True if the video capture is open, False otherwise.
         """
         with self._lock:
-            return self.cap.isOpened()
+            if self._is_released or self.cap is None:
+                return False
+            try:
+                return self.cap.isOpened()
+            except Exception:
+                return False
 
     def release(self):
         """
-        Release the video capture and stop the frame reading thread.
+        Release the video capture and stop the frame reading thread safely and idempotently.
         """
-        self._stop_event.set()  # Signal the thread to stop
+        self._stop_event.set()  # Signal the thread to stop immediately
 
-        if self.thread.is_alive():
-            self.thread.join()  # Wait for the thread to exit
+        # Wait for thread with a short timeout to prevent deadlocks on shutdown
+        if hasattr(self, "thread") and self.thread.is_alive():
+            self.thread.join(timeout=0.3)
         
         with self._lock:
-            if self.cap.isOpened():
-                self.cap.release()
-            
-        # Clear the frame buffer
-        self._current_frame = None
+            if not self._is_released:
+                self._is_released = True
+                try:
+                    if self.cap is not None and self.cap.isOpened():
+                        self.cap.release()
+                except Exception:
+                    pass
+                self._current_frame = None
 
     def get_fps(self):
         """
